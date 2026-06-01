@@ -6,6 +6,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY server.js ./
+COPY explanation-transform.js ./
 COPY public ./public
 
 ENV NODE_ENV=production
