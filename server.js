@@ -21,7 +21,6 @@ app.disable("x-powered-by");
 const truthy = (value) => ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
 const PUBLIC_ACCESS = truthy(process.env.PUBLIC_ACCESS) || truthy(process.env.CLOUD_MODE);
 const AUTH_REQUIRED = PUBLIC_ACCESS || truthy(process.env.AUTH_REQUIRED) || !!process.env.APP_PASSWORD || !!process.env.APP_PASSWORD_HASH;
-const APP_USER = process.env.APP_USER || "admin";
 const APP_PASSWORD = process.env.APP_PASSWORD || "";
 const APP_PASSWORD_HASH = process.env.APP_PASSWORD_HASH || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
@@ -244,12 +243,10 @@ const renderLoginPage = (message = "") => `<!doctype html>
     <form method="post" action="/login" autocomplete="on">
       <h1>ニッチ補助金ファインダー</h1>
       ${message ? `<div class="error">${message}</div>` : ""}
-      <label for="username">ユーザー名</label>
-      <input id="username" name="username" autocomplete="username" required autofocus>
       <label for="password">パスワード</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
       <button type="submit">ログイン</button>
-      <div class="note">URLを知っている人だけでなく、ログイン情報を知っている人だけが利用できます。</div>
+      <div class="note">URLを知っている人だけでなく、パスワードを知っている人だけが利用できます。</div>
     </form>
   </main>
 </body>
@@ -275,14 +272,13 @@ app.get("/login", (req, res) => {
 
 app.post("/login", rateLimit({ name: "login", windowMs: 5 * 60 * 1000, max: 20 }), (req, res) => {
   if (!AUTH_REQUIRED) return res.redirect(302, "/");
-  const username = String(req.body?.username || "").trim();
   const password = String(req.body?.password || "");
-  if (username === APP_USER && verifyPassword(password)) {
-    res.setHeader("Set-Cookie", createSession(req, username));
+  if (verifyPassword(password)) {
+    res.setHeader("Set-Cookie", createSession(req, "authenticated"));
     return res.redirect(303, "/");
   }
   res.setHeader("Cache-Control", "no-store");
-  return res.status(401).type("html").send(renderLoginPage("ユーザー名またはパスワードが違います。"));
+  return res.status(401).type("html").send(renderLoginPage("パスワードが違います。"));
 });
 
 app.post("/logout", (_req, res) => {
