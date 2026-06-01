@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f766e" />
+    <title>業務タスクボード</title>
+    <link rel="stylesheet" href="/app-switcher.css?v=20260601b" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <section class="auth-overlay" id="authOverlay" hidden>
+      <form class="auth-panel" id="loginForm">
+        <div class="auth-mark" aria-hidden="true">
+          <i data-lucide="lock-keyhole"></i>
+        </div>
+        <h1>業務タスクボード</h1>
+        <p>共有タスクを開くにはパスワードを入力してください。</p>
+        <label>
+          <span>パスワード</span>
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button class="primary-button" type="submit">
+          <i data-lucide="log-in"></i>
+          <span>開く</span>
+        </button>
+        <p class="auth-message" id="authMessage" role="status"></p>
+      </form>
+    </section>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <i data-lucide="briefcase-business"></i>
+          </span>
+          <div>
+            <h1>業務タスクボード</h1>
+            <p id="scopeLabel">今日の業務</p>
+          </div>
+        </div>
+
+        <div class="top-actions" aria-label="日付操作">
+          <span class="sync-status is-muted" id="syncStatus">接続確認中</span>
+          <button class="icon-button" type="button" data-action="prev" aria-label="前へ" data-help="表示中の日・週・月をひとつ前に移動します。1日表示なら前日、1週間表示なら前週、1か月表示なら前月へ移動します。">
+            <i data-lucide="chevron-left"></i>
+          </button>
+          <button class="text-button" type="button" data-action="today" data-help="今日の日付に戻ります。どの表示で見ていても、基準日を今日に戻して確認できます。">
+            <i data-lucide="calendar-days"></i>
+            <span>今日</span>
+          </button>
+          <button class="icon-button" type="button" data-action="next" aria-label="次へ" data-help="表示中の日・週・月をひとつ先に移動します。1日表示なら翌日、1週間表示なら翌週、1か月表示なら翌月へ移動します。">
+            <i data-lucide="chevron-right"></i>
+          </button>
+          <button class="icon-button help-button" type="button" data-action="open-help" aria-label="ヘルプ" data-help="操作方法と各ボタンの詳しい説明を開きます。初めて使うときや、お客様に画面を説明するときに便利です。">
+            <i data-lucide="circle-help"></i>
+          </button>
+          <button class="icon-button" id="logoutButton" type="button" data-action="logout" aria-label="ログアウト" data-help="共有タスクボードからログアウトします。公開URLを使うため、共用端末や客先端末で使った後はここから閉じると安心です。">
+            <i data-lucide="log-out"></i>
+          </button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="sidebar">
+          <button class="primary-button" type="button" data-action="open-new" data-help="新しいタスクを追加します。タスク名、案件・顧客、担当、日付、時刻、種類、重要度、メモを登録できます。">
+            <i data-lucide="plus"></i>
+            <span>タスク追加</span>
+          </button>
+
+          <nav class="view-tabs" aria-label="表示切り替え">
+            <button type="button" data-view="day" aria-selected="true" data-help="1日分を午前・午後・時間なしに分けて表示します。今日やる作業を集中して確認したいときに使います。">
+              <i data-lucide="panel-top"></i>
+              <span>1日</span>
+            </button>
+            <button type="button" data-view="week" aria-selected="false" data-help="1週間分を曜日ごとの列で表示します。今週の負荷や締切の偏りを見るときに使います。">
+              <i data-lucide="columns-3"></i>
+              <span>1週間</span>
+            </button>
+            <button type="button" data-view="month" aria-selected="false" data-help="1か月分をカレンダー形式で表示します。月内の予定分布や重要タスクの配置を俯瞰できます。">
+              <i data-lucide="calendar-range"></i>
+              <span>1か月</span>
+            </button>
+          </nav>
+
+          <section class="stats-grid" aria-label="業務集計">
+            <div>
+              <span id="criticalCount">0</span>
+              <p>最重要</p>
+            </div>
+            <div>
+              <span id="overdueCount">0</span>
+              <p>期限超過</p>
+            </div>
+            <div>
+              <span id="todayCount">0</span>
+              <p>今日</p>
+            </div>
+            <div>
+              <span id="doneRate">0%</span>
+              <p>完了率</p>
+            </div>
+          </section>
+
+          <div class="filters">
+            <label>
+              <span>検索</span>
+              <div class="input-shell">
+                <i data-lucide="search"></i>
+                <input id="searchInput" type="search" placeholder="タスク・案件・担当" autocomplete="off" data-help="タスク名、メモ、案件・顧客、担当、種類からキーワード検索します。入力すると表示中の一覧がすぐ絞り込まれます。" />
+              </div>
+            </label>
+
+            <div class="filter-row">
+              <label>
+                <span>状態</span>
+                <select id="statusFilter" data-help="未完了、期限超過、今日、すべて、完了で表示対象を切り替えます。確認したい状態だけに絞れます。">
+                  <option value="active">未完了</option>
+                  <option value="overdue">期限超過</option>
+                  <option value="today">今日</option>
+                  <option value="all">すべて</option>
+                  <option value="done">完了</option>
+                </select>
+              </label>
+
+              <label>
+                <span>重要度</span>
+                <select id="priorityFilter" data-help="最重要、高め、普通、低めでタスクを絞り込みます。重要度の高い案件だけを確認したいときに使います。">
+                  <option value="all">すべて</option>
+                  <option value="critical">最重要</option>
+                  <option value="high">高め</option>
+                  <option value="normal">普通</option>
+                  <option value="low">低め</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <section class="focus-panel">
+            <div class="section-title">
+              <i data-lucide="badge-alert"></i>
+              <h2>重要案件</h2>
+            </div>
+            <div id="focusList" class="focus-list"></div>
+          </section>
+
+          <section class="upcoming">
+            <div class="section-title">
+              <i data-lucide="list-checks"></i>
+              <h2>次のタスク</h2>
+            </div>
+            <div id="upcomingList" class="upcoming-list"></div>
+          </section>
+        </aside>
+
+        <section class="workspace" aria-live="polite">
+          <div class="workspace-head">
+            <div>
+              <p id="viewKicker">1日</p>
+              <h2 id="viewTitle">今日</h2>
+            </div>
+            <div class="progress-box">
+              <span id="visibleSummary">0件</span>
+              <div class="progress-track" aria-hidden="true">
+                <span id="progressFill"></span>
+              </div>
+            </div>
+          </div>
+
+          <section id="workSummary" class="work-summary" aria-label="業務サマリー"></section>
+          <div id="calendarArea" class="calendar-area"></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="taskDialog" aria-labelledby="dialogTitle">
+      <form id="taskForm" class="task-form">
+        <div class="dialog-head">
+          <h2 id="dialogTitle">タスク追加</h2>
+          <button class="icon-button" type="button" data-action="close-dialog" aria-label="閉じる" data-help="入力内容を保存せずに編集画面を閉じます。保存したい場合は右下の保存ボタンを使います。">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <label>
+          <span>タスク名</span>
+            <input id="taskTitle" name="title" type="text" maxlength="80" required data-help="タスクの名前を入力します。一覧で最も目立つ項目なので、次に何をするかが一目でわかる書き方がおすすめです。" />
+        </label>
+
+        <div class="form-row">
+          <label>
+            <span>案件・顧客</span>
+            <input id="taskProject" name="project" type="text" maxlength="60" placeholder="例: A社 提案書" data-help="案件名や顧客名を入力します。タスクカード上ではタグとして表示され、検索対象にもなります。" />
+          </label>
+          <label>
+            <span>担当</span>
+            <input id="taskOwner" name="owner" type="text" maxlength="40" placeholder="例: 自分" data-help="担当者を入力します。自分、チーム名、担当部署などを入れておくと、確認や検索がしやすくなります。" />
+          </label>
+        </div>
+
+        <div class="form-row">
+          <label>
+            <span>日付</span>
+            <input id="taskDate" name="date" type="date" required data-help="タスクを実施または期限管理したい日付です。今日より前で未完了の場合は期限超過として目立ちます。" />
+          </label>
+          <label>
+            <span>時刻</span>
+            <input id="taskTime" name="time" type="time" data-help="予定時刻を入れます。空欄にすると時間なしのタスクとして扱われます。" />
+          </label>
+        </div>
+
+        <div class="form-row">
+          <label>
+            <span>種類</span>
+            <select id="taskCategory" name="category" data-help="タスクの種類を選びます。顧客対応、提案、社内、請求など、仕事の分類としてカードに表示されます。">
+              <option value="顧客対応">顧客対応</option>
+              <option value="提案">提案</option>
+              <option value="社内">社内</option>
+              <option value="請求">請求</option>
+              <option value="私用">私用</option>
+              <option value="その他">その他</option>
+            </select>
+          </label>
+          <label>
+            <span>重要度</span>
+            <select id="taskPriority" name="priority" data-help="重要度を選びます。最重要は赤系で強調され、重要案件欄にも優先して表示されます。">
+              <option value="critical">最重要</option>
+              <option value="high">高め</option>
+              <option value="normal">普通</option>
+              <option value="low">低め</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          <span>メモ</span>
+          <textarea id="taskNotes" name="notes" rows="4" maxlength="240" data-help="補足メモを入力します。確認事項、先方への返信内容、注意点などを短く残せます。"></textarea>
+        </label>
+
+        <label class="check-row">
+          <input id="taskDone" name="done" type="checkbox" data-help="チェックすると完了済みとして保存されます。完了済みタスクは薄く表示され、完了率に反映されます。" />
+          <span>完了済み</span>
+        </label>
+
+        <div class="dialog-actions">
+          <button class="danger-button" id="deleteTaskButton" type="button" data-action="delete-task" data-help="編集中のタスクを削除します。不要になった予定や誤って作成したタスクを消すときに使います。">
+            <i data-lucide="trash-2"></i>
+            <span>削除</span>
+          </button>
+          <button class="primary-button" type="submit" data-help="入力内容を保存します。新規作成の場合はタスクが追加され、編集の場合は既存タスクが更新されます。">
+            <i data-lucide="save"></i>
+            <span>保存</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
+      <div class="help-content">
+        <div class="dialog-head">
+          <div>
+            <p class="help-kicker">操作ガイド</p>
+            <h2 id="helpTitle">業務タスクボードの使い方</h2>
+          </div>
+          <button class="icon-button" type="button" data-action="close-help" aria-label="ヘルプを閉じる" data-help="ヘルプ画面を閉じて、元のタスク画面に戻ります。">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <section>
+          <h3>基本の使い方</h3>
+          <p>この画面は、仕事のタスクを「今日やること」「今週の流れ」「月全体の予定」の3つの粒度で見られる業務用ボードです。タスクはブラウザ内に保存されるため、同じブラウザで開けば追加した内容が残ります。</p>
+          <p>まずは左の「タスク追加」から予定を登録します。重要なものは重要度を「最重要」または「高め」にしておくと、左側の重要案件欄とメインのカード上で目立ちます。</p>
+        </section>
+
+        <section>
+          <h3>右上のボタン</h3>
+          <dl class="help-list">
+            <div><dt>前へ</dt><dd>表示している期間をひとつ前に戻します。1日表示なら前日、1週間表示なら前週、1か月表示なら前月です。</dd></div>
+            <div><dt>今日</dt><dd>基準日を今日に戻します。別の日や別月を見ていても、すぐ今日の予定に戻れます。</dd></div>
+            <div><dt>次へ</dt><dd>表示している期間をひとつ先へ進めます。翌日、翌週、翌月の確認に使います。</dd></div>
+            <div><dt>？</dt><dd>このヘルプを開きます。ボタンの役割、操作の流れ、重要度の見え方、保存の仕組みを確認できます。</dd></div>
+          </dl>
+        </section>
+
+        <section>
+          <h3>表示切り替え</h3>
+          <dl class="help-list">
+            <div><dt>1日</dt><dd>選択中の日を、時間なし・午前・午後に分けて表示します。今日やる作業の順番を確認するのに向いています。</dd></div>
+            <div><dt>1週間</dt><dd>月曜から日曜までを列で表示します。締切が偏っていないか、重要案件がどの日に集中しているかを見られます。</dd></div>
+            <div><dt>1か月</dt><dd>カレンダー形式で月全体を表示します。商談、請求、社内締切などの配置をお客様に見せても整って見えるようにしています。</dd></div>
+          </dl>
+        </section>
+
+        <section>
+          <h3>タスク操作</h3>
+          <dl class="help-list">
+            <div><dt>タスク追加</dt><dd>新しいタスクを作成します。タスク名、案件・顧客、担当、日付、時刻、種類、重要度、メモを登録できます。</dd></div>
+            <div><dt>各日の＋</dt><dd>その日付を指定した状態でタスク追加画面を開きます。週表示や月表示で予定を見ながら追加するときに便利です。</dd></div>
+            <div><dt>丸い完了ボタン</dt><dd>タスクの完了/未完了を切り替えます。完了にするとカードが薄くなり、完了率に反映されます。</dd></div>
+            <div><dt>タスク名</dt><dd>タスク編集画面を開きます。内容の修正、重要度変更、完了済みへの変更、削除ができます。</dd></div>
+            <div><dt>保存</dt><dd>入力内容を保存します。新規作成なら追加、編集なら上書き更新されます。</dd></div>
+            <div><dt>削除</dt><dd>編集中のタスクを削除します。削除したタスクは一覧から消えます。</dd></div>
+            <div><dt>閉じる</dt><dd>編集画面やヘルプ画面を閉じます。タスク編集画面では、保存前の入力内容は反映されません。</dd></div>
+          </dl>
+        </section>
+
+        <section>
+          <h3>重要度と目立ち方</h3>
+          <p>重要度は「最重要」「高め」「普通」「低め」の4段階です。最重要は赤系の背景と強い線で表示され、重要案件欄にも優先して出ます。期限を過ぎた未完了タスクは「期限超過」としてさらに目立つため、対応漏れを見つけやすくなります。</p>
+          <p>お客様に画面を見せる場面では、最重要だけを必要最小限にしておくと、画面全体が締まって見えます。通常のタスクは普通または高めにして、緊急性のあるものだけ最重要にする運用がおすすめです。</p>
+        </section>
+
+        <section>
+          <h3>検索と絞り込み</h3>
+          <dl class="help-list">
+            <div><dt>検索</dt><dd>タスク名、メモ、案件・顧客、担当、種類からキーワード検索できます。顧客名や担当者名で探すときに便利です。</dd></div>
+            <div><dt>状態</dt><dd>未完了、期限超過、今日、すべて、完了から表示対象を切り替えます。確認したい状態だけに絞り込めます。</dd></div>
+            <div><dt>重要度</dt><dd>重要度ごとに表示を絞れます。最重要だけ、高めだけ、低めだけといった確認ができます。</dd></div>
+          </dl>
+        </section>
+
+        <section>
+          <h3>左側の情報</h3>
+          <p>左側には、最重要、期限超過、今日、完了率の集計があります。その下の重要案件欄には、最重要、高め、期限超過のタスクが優先して表示されます。さらに次のタスク欄では、これから来る未完了タスクを日付順に確認できます。</p>
+        </section>
+
+        <section>
+          <h3>簡易説明の表示</h3>
+          <p>ボタンや入力欄の上でマウスポイントを少し止めると、短い説明が表示されます。マウスを外すと説明は自動で消えます。操作に迷ったときは、押す前に少し止めて確認できます。</p>
+        </section>
+
+        <section>
+          <h3>起動と保存</h3>
+          <p>このアプリはローカルURLで動いています。起動ファイルから立ち上げると、サーバーが止まっている場合は自動で起動し、URLが開ける状態か確認してからブラウザを開きます。登録したタスクはブラウザ内に保存されます。</p>
+        </section>
+      </div>
+    </dialog>
+
+    <div id="quickHelp" class="quick-help" role="tooltip" hidden></div>
+    <script src="/app-switcher.js?v=20260601b" defer></script>
+  </body>
+</html>

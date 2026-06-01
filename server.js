@@ -9,15 +9,18 @@
 import express from "express";
 import axios from "axios";
 import "dotenv/config";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import os from "os";
 import crypto from "crypto";
 import pg from "pg";
+import { transformMemo } from "./explanation-transform.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.disable("x-powered-by");
+const { Pool } = pg;
 
 const truthy = (value) => ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
 const PUBLIC_ACCESS = truthy(process.env.PUBLIC_ACCESS) || truthy(process.env.CLOUD_MODE);
@@ -41,7 +44,6 @@ const getDbSslConfig = () => {
   return undefined;
 };
 
-const { Pool } = pg;
 const dbPool = DATABASE_URL
   ? new Pool({
       connectionString: DATABASE_URL,
@@ -53,6 +55,15 @@ const dbPool = DATABASE_URL
   : null;
 const dbStatus = { enabled: !!dbPool, ready: false, error: "" };
 let dbInitPromise = null;
+const pgPool = dbPool;
+const hearingEventClients = new Set();
+const hearingDataDir = path.resolve(process.env.HEARING_DATA_DIR || path.join(__dirname, "data"));
+const hearingCasesFile = path.join(hearingDataDir, "hearing-cases.json");
+let hearingStoreReady = null;
+let hearingFileQueue = Promise.resolve();
+const TASKS_FILE = path.join(__dirname, ".data", "shared-tasks.json");
+let taskStoreReady = null;
+let taskFileQueue = Promise.resolve();
 
 if (PUBLIC_ACCESS) {
   app.set("trust proxy", 1);
@@ -108,7 +119,7 @@ const isSameHostUrl = (req, value) => {
 const securityHeaders = (_req, res, next) => {
   res.setHeader("Content-Security-Policy", [
     "default-src 'self'",
-    "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'",
+    "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com 'unsafe-inline'",
     "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'",
     "img-src 'self' data:",
     "connect-src 'self'",
@@ -247,12 +258,491 @@ const createSession = (req, user) => {
   return buildSessionCookie(req, token);
 };
 
-const renderLoginPage = (message = "") => `<!doctype html>
+const priorityValues = new Set(["critical", "high", "normal", "low"]);
+
+const cleanTaskText = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
+
+const normalizeTask = (task = {}) => {
+  const now = Date.now();
+  return {
+    id: cleanTaskText(task.id, 120) || crypto.randomUUID(),
+    title: cleanTaskText(task.title, 80) || "無題のタスク",
+    project: cleanTaskText(task.project, 60),
+    owner: cleanTaskText(task.owner, 40),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(task.date || "") ? task.date : new Date().toISOString().slice(0, 10),
+    time: /^\d{2}:\d{2}$/.test(task.time || "") ? task.time : "",
+    category: cleanTaskText(task.category, 24) || "その他",
+    priority: priorityValues.has(task.priority) ? task.priority : "normal",
+    notes: cleanTaskText(task.notes, 240),
+    done: Boolean(task.done),
+    createdAt: Number.isFinite(Number(task.createdAt)) ? Number(task.createdAt) : now
+  };
+};
+
+const normalizeExplanationDraft = (draft = {}) => ({
+  id: cleanTaskText(draft.id, 120) || crypto.randomUUID(),
+  createdAt: draft.createdAt || new Date().toISOString(),
+  title: cleanTaskText(draft.title, 120) || "下書き",
+  memo: cleanTaskText(draft.memo, 12000),
+  output: cleanTaskText(draft.output, 12000),
+  audience: cleanTaskText(draft.audience, 40) || "boss",
+  purpose: cleanTaskText(draft.purpose, 40) || "report",
+  tone: cleanTaskText(draft.tone, 40) || "polite",
+  format: cleanTaskText(draft.format, 40) || "email",
+  detail: cleanTaskText(draft.detail, 40) || "standard"
+});
+
+const ensureExplanationDraftStore = async () => {
+  if (!pgPool) return false;
+  await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS explanation_drafts (
+      id TEXT PRIMARY KEY,
+      payload JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  return true;
+};
+
+const ensureTaskStore = async () => {
+  if (taskStoreReady) return taskStoreReady;
+  taskStoreReady = (async () => {
+    if (pgPool) {
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS shared_tasks (
+          id TEXT PRIMARY KEY,
+          payload JSONB NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+      return;
+    }
+    await fs.promises.mkdir(path.dirname(TASKS_FILE), { recursive: true });
+    try {
+      await fs.promises.access(TASKS_FILE);
+    } catch {
+      await fs.promises.writeFile(TASKS_FILE, JSON.stringify({ tasks: [], updatedAt: null }, null, 2), "utf8");
+    }
+  })();
+  return taskStoreReady;
+};
+
+const readTaskStore = async () => {
+  await ensureTaskStore();
+  if (pgPool) {
+    const result = await pgPool.query("SELECT payload, updated_at FROM shared_tasks ORDER BY updated_at DESC");
+    const tasks = result.rows.map((row) => normalizeTask(row.payload));
+    const updatedAt = result.rows[0]?.updated_at ? new Date(result.rows[0].updated_at).toISOString() : null;
+    return { tasks, updatedAt };
+  }
+  const content = await fs.promises.readFile(TASKS_FILE, "utf8");
+  const parsed = JSON.parse(content);
+  return {
+    tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map(normalizeTask) : [],
+    updatedAt: parsed.updatedAt || null
+  };
+};
+
+const writeTaskFile = async (tasks) => {
+  await ensureTaskStore();
+  const store = { tasks: tasks.map(normalizeTask), updatedAt: new Date().toISOString() };
+  await fs.promises.mkdir(path.dirname(TASKS_FILE), { recursive: true });
+  const temporaryFile = `${TASKS_FILE}.${process.pid}.${Date.now()}.tmp`;
+  await fs.promises.writeFile(temporaryFile, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+  await fs.promises.rename(temporaryFile, TASKS_FILE);
+  return store;
+};
+
+const mutateTaskStore = async (work) => {
+  if (pgPool) {
+    await ensureTaskStore();
+    return work();
+  }
+  const run = taskFileQueue.then(async () => {
+    const current = await readTaskStore();
+    const nextTasks = await work(current.tasks);
+    if (!nextTasks) return null;
+    return writeTaskFile(nextTasks);
+  });
+  taskFileQueue = run.catch(() => {});
+  return run;
+};
+
+const escapeHtml = (value) => String(value ?? "")
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
+
+const safeNextPath = (value) => {
+  const next = String(value || "/");
+  if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\") || next.startsWith("/login")) return "/";
+  return next;
+};
+
+const cleanHearingText = (value, maxLength = 160) => String(value || "").trim().slice(0, maxLength);
+
+const sanitizeHearingMode = (value) => (value === "personal" ? "personal" : "company");
+
+const sanitizeHearingState = (value) => (
+  value && typeof value === "object" && !Array.isArray(value) ? value : {}
+);
+
+const isoDate = (value, fallback = new Date().toISOString()) => {
+  const date = new Date(value || "");
+  return Number.isNaN(date.getTime()) ? fallback : date.toISOString();
+};
+
+const getHearingStateText = (state, keys, maxLength = 160) => {
+  for (const key of keys) {
+    const value = cleanHearingText(state?.[key], maxLength);
+    if (value) return value;
+  }
+  return "";
+};
+
+const normalizeStoredHearingCase = (record = {}) => {
+  const now = new Date().toISOString();
+  const state = sanitizeHearingState(record.state);
+  const clientName = cleanHearingText(
+    record.clientName || record.client_name || getHearingStateText(state, ["companyName", "businessName", "contactName", "representativeName"]),
+    140
+  );
+  const subsidyType = cleanHearingText(record.subsidyType || record.subsidy_type || state.subsidyType, 100);
+  const title = cleanHearingText(record.title || clientName || getHearingStateText(state, ["projectName", "planName"]), 180) || "名称未入力";
+  return {
+    id: cleanHearingText(record.id, 120) || crypto.randomUUID(),
+    mode: sanitizeHearingMode(record.mode || state.mode),
+    title,
+    clientName,
+    subsidyType,
+    state,
+    createdAt: isoDate(record.createdAt || record.created_at, now),
+    updatedAt: isoDate(record.updatedAt || record.updated_at, now),
+    updatedBy: cleanHearingText(record.updatedBy || record.updated_by || "利用者", 80),
+    lastClientId: cleanHearingText(record.lastClientId || record.last_client_id || "", 160),
+    revision: Math.max(1, Number(record.revision || 1))
+  };
+};
+
+const buildHearingCaseRecord = (body = {}, current = null) => {
+  const now = new Date().toISOString();
+  const state = sanitizeHearingState(body.state ?? current?.state);
+  const base = normalizeStoredHearingCase({ ...current, state });
+  const clientName = cleanHearingText(
+    body.clientName || body.client_name || getHearingStateText(state, ["companyName", "businessName", "contactName", "representativeName"]),
+    140
+  );
+  const subsidyType = cleanHearingText(body.subsidyType || body.subsidy_type || state.subsidyType, 100);
+  const title = cleanHearingText(body.title || clientName || getHearingStateText(state, ["projectName", "planName"]), 180) || "名称未入力";
+  return {
+    id: current?.id || cleanHearingText(body.id, 120) || crypto.randomUUID(),
+    mode: sanitizeHearingMode(body.mode || state.mode || current?.mode),
+    title,
+    clientName,
+    subsidyType,
+    state,
+    createdAt: current?.createdAt || base.createdAt || now,
+    updatedAt: now,
+    updatedBy: cleanHearingText(body.updatedBy || body.updated_by || current?.updatedBy || "利用者", 80),
+    lastClientId: cleanHearingText(body.clientId || body.lastClientId || body.last_client_id || current?.lastClientId || "", 160),
+    revision: current ? Math.max(1, Number(current.revision || 1) + 1) : 1
+  };
+};
+
+const hearingCaseSummary = (record) => {
+  const item = normalizeStoredHearingCase(record);
+  return {
+    id: item.id,
+    mode: item.mode,
+    title: item.title,
+    clientName: item.clientName,
+    subsidyType: item.subsidyType,
+    updatedAt: item.updatedAt,
+    updatedBy: item.updatedBy,
+    lastClientId: item.lastClientId,
+    revision: item.revision
+  };
+};
+
+const rowToHearingCase = (row = {}) => normalizeStoredHearingCase({
+  id: row.id,
+  mode: row.mode,
+  title: row.title,
+  clientName: row.client_name,
+  subsidyType: row.subsidy_type,
+  state: row.state,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  updatedBy: row.updated_by,
+  lastClientId: row.last_client_id,
+  revision: row.revision
+});
+
+const ensureHearingStore = async () => {
+  if (hearingStoreReady) return hearingStoreReady;
+  hearingStoreReady = (async () => {
+    if (pgPool) {
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS gp_hearing_cases (
+          id TEXT PRIMARY KEY,
+          mode TEXT NOT NULL,
+          title TEXT NOT NULL,
+          client_name TEXT,
+          subsidy_type TEXT,
+          state JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL,
+          updated_by TEXT,
+          last_client_id TEXT,
+          revision INTEGER NOT NULL DEFAULT 1
+        )
+      `);
+      await pgPool.query("CREATE INDEX IF NOT EXISTS gp_hearing_cases_mode_updated_idx ON gp_hearing_cases(mode, updated_at DESC)");
+      return;
+    }
+    await fs.promises.mkdir(hearingDataDir, { recursive: true });
+    try {
+      await fs.promises.access(hearingCasesFile);
+    } catch {
+      await fs.promises.writeFile(hearingCasesFile, JSON.stringify({ version: 1, cases: [], updatedAt: null }, null, 2), "utf8");
+    }
+  })();
+  return hearingStoreReady;
+};
+
+const readHearingFile = async () => {
+  await ensureHearingStore();
+  const content = await fs.promises.readFile(hearingCasesFile, "utf8");
+  const parsed = JSON.parse(content);
+  const cases = Array.isArray(parsed.cases) ? parsed.cases.map(normalizeStoredHearingCase) : [];
+  return { cases, updatedAt: parsed.updatedAt || null };
+};
+
+const writeHearingFile = async (cases) => {
+  await ensureHearingStore();
+  const store = {
+    version: 1,
+    cases: cases.map(normalizeStoredHearingCase),
+    updatedAt: new Date().toISOString()
+  };
+  const temporaryFile = `${hearingCasesFile}.${process.pid}.${Date.now()}.tmp`;
+  await fs.promises.writeFile(temporaryFile, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+  await fs.promises.rename(temporaryFile, hearingCasesFile);
+  return store;
+};
+
+const listHearingCases = async ({ mode, query }) => {
+  await ensureHearingStore();
+  const normalizedMode = sanitizeHearingMode(mode);
+  const normalizedQuery = cleanHearingText(query, 80).toLowerCase();
+  if (pgPool) {
+    const values = [normalizedMode];
+    let where = "WHERE mode = $1";
+    if (normalizedQuery) {
+      values.push(`%${normalizedQuery}%`);
+      where += ` AND (
+        lower(title) LIKE $2 OR
+        lower(coalesce(client_name, '')) LIKE $2 OR
+        lower(coalesce(subsidy_type, '')) LIKE $2
+      )`;
+    }
+    const result = await pgPool.query(`
+      SELECT id, mode, title, client_name, subsidy_type, state, created_at, updated_at, updated_by, last_client_id, revision
+      FROM gp_hearing_cases
+      ${where}
+      ORDER BY updated_at DESC
+      LIMIT 200
+    `, values);
+    return result.rows.map(rowToHearingCase);
+  }
+  const store = await readHearingFile();
+  return store.cases
+    .filter((item) => item.mode === normalizedMode)
+    .filter((item) => !normalizedQuery || [item.title, item.clientName, item.subsidyType].some((value) => String(value || "").toLowerCase().includes(normalizedQuery)))
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, 200);
+};
+
+const getHearingCase = async (id) => {
+  const caseId = cleanHearingText(id, 120);
+  await ensureHearingStore();
+  if (pgPool) {
+    const result = await pgPool.query(`
+      SELECT id, mode, title, client_name, subsidy_type, state, created_at, updated_at, updated_by, last_client_id, revision
+      FROM gp_hearing_cases
+      WHERE id = $1
+    `, [caseId]);
+    return result.rowCount ? rowToHearingCase(result.rows[0]) : null;
+  }
+  const store = await readHearingFile();
+  return store.cases.find((item) => item.id === caseId) || null;
+};
+
+const saveNewHearingCase = async (body) => {
+  const record = buildHearingCaseRecord(body);
+  await ensureHearingStore();
+  if (pgPool) {
+    await pgPool.query(`
+      INSERT INTO gp_hearing_cases
+        (id, mode, title, client_name, subsidy_type, state, created_at, updated_at, updated_by, last_client_id, revision)
+      VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11)
+    `, [
+      record.id,
+      record.mode,
+      record.title,
+      record.clientName,
+      record.subsidyType,
+      JSON.stringify(record.state),
+      record.createdAt,
+      record.updatedAt,
+      record.updatedBy,
+      record.lastClientId,
+      record.revision
+    ]);
+    return record;
+  }
+  const run = hearingFileQueue.then(async () => {
+    const current = await readHearingFile();
+    return writeHearingFile([record, ...current.cases]);
+  });
+  hearingFileQueue = run.catch(() => {});
+  const store = await run;
+  return store.cases.find((item) => item.id === record.id) || record;
+};
+
+const updateHearingCase = async (id, body) => {
+  const caseId = cleanHearingText(id, 120);
+  await ensureHearingStore();
+  if (pgPool) {
+    const current = await getHearingCase(caseId);
+    if (!current) return { status: "missing" };
+    if (Number(body.revision || 0) && Number(body.revision) !== Number(current.revision || 0)) {
+      return { status: "conflict", case: current };
+    }
+    const record = buildHearingCaseRecord(body, current);
+    await pgPool.query(`
+      UPDATE gp_hearing_cases
+      SET mode = $2,
+          title = $3,
+          client_name = $4,
+          subsidy_type = $5,
+          state = $6::jsonb,
+          updated_at = $7,
+          updated_by = $8,
+          last_client_id = $9,
+          revision = $10
+      WHERE id = $1
+    `, [
+      record.id,
+      record.mode,
+      record.title,
+      record.clientName,
+      record.subsidyType,
+      JSON.stringify(record.state),
+      record.updatedAt,
+      record.updatedBy,
+      record.lastClientId,
+      record.revision
+    ]);
+    return { status: "saved", case: record };
+  }
+  const run = hearingFileQueue.then(async () => {
+    const current = await readHearingFile();
+    const index = current.cases.findIndex((item) => item.id === caseId);
+    if (index === -1) return { status: "missing" };
+    const existing = current.cases[index];
+    if (Number(body.revision || 0) && Number(body.revision) !== Number(existing.revision || 0)) {
+      return { status: "conflict", case: existing };
+    }
+    const record = buildHearingCaseRecord(body, existing);
+    const nextCases = [...current.cases];
+    nextCases[index] = record;
+    await writeHearingFile(nextCases);
+    return { status: "saved", case: record };
+  });
+  hearingFileQueue = run.catch(() => {});
+  return run;
+};
+
+const publishHearingCasesChanged = (record) => {
+  const payload = `event: cases-changed\ndata: ${JSON.stringify({ case: hearingCaseSummary(record) })}\n\n`;
+  for (const res of hearingEventClients) {
+    res.write(payload);
+  }
+};
+
+const renderInternalHub = () => `<!doctype html>
 <html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ログイン - ニッチ補助金ファインダー</title>
+  <title>統合メニュー - 補助金クラウド</title>
+  <link rel="stylesheet" href="/app-switcher.css?v=20260601b">
+  <script defer src="/app-switcher.js?v=20260601b"></script>
+  <style>
+    body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f7;color:#18221f}
+    .wrap{max-width:1040px;margin:0 auto;padding:28px}
+    header{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:22px}
+    h1{font-size:26px;margin:0 0 6px}
+    p{margin:0;color:#5f6f69;line-height:1.7}
+    .logout{border:1px solid #cdd8d4;border-radius:8px;background:white;color:#263b35;padding:10px 14px;text-decoration:none;font-weight:700}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:22px}
+    .tile{display:flex;flex-direction:column;gap:10px;min-height:142px;padding:18px;border:1px solid #d8e3df;border-radius:8px;background:white;text-decoration:none;color:inherit;box-shadow:0 10px 24px rgba(31,57,49,.06)}
+    .tile strong{font-size:18px}
+    .tile span{color:#64746f;line-height:1.6}
+    .tag{width:max-content;border-radius:999px;padding:4px 9px;background:#e5f3ed;color:#0f6b4f;font-weight:700;font-size:12px}
+    @media (max-width:640px){.wrap{padding:18px}header{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div>
+        <h1>統合メニュー</h1>
+        <p>補助金検索、ヒアリング、説明変換、タスク管理を1つのWebサービス内で切り替えます。</p>
+      </div>
+      <a class="logout" href="/logout">ログアウト</a>
+    </header>
+    <section class="grid" aria-label="利用できるアプリ">
+      <a class="tile" href="/">
+        <span class="tag">検索</span>
+        <strong>補助金検索</strong>
+        <span>国・自治体の補助金を探し、候補整理に使います。</span>
+      </a>
+      <a class="tile" href="/internal/hearing/company">
+        <span class="tag">共有保存</span>
+        <strong>ヒアリング整理（会社用）</strong>
+        <span>法人・会社向けのヒアリング内容を整理し、社内で共有保存します。</span>
+      </a>
+      <a class="tile" href="/internal/hearing/personal">
+        <span class="tag">共有保存</span>
+        <strong>ヒアリング整理（個人用）</strong>
+        <span>個人事業主向けのヒアリング内容を整理し、外出先からも確認できます。</span>
+      </a>
+      <a class="tile" href="/explanation/">
+        <span class="tag">文章整理</span>
+        <strong>説明変換ワークベンチ</strong>
+        <span>業務メモを、お客様や社内で共有しやすい説明文に整えます。</span>
+      </a>
+      <a class="tile" href="/tasks/">
+        <span class="tag">社内管理</span>
+        <strong>業務タスクボード</strong>
+        <span>社内の作業予定や担当を共有して、対応漏れを減らします。</span>
+      </a>
+    </section>
+  </main>
+</body>
+</html>`;
+
+const renderLoginPage = (nextPath = "/", message = "") => `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ログイン - 補助金クラウド</title>
   <style>
     body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f4f7fb;color:#1a202c}
     main{min-height:100vh;display:grid;place-items:center;padding:24px}
@@ -268,8 +758,9 @@ const renderLoginPage = (message = "") => `<!doctype html>
 <body>
   <main>
     <form method="post" action="/login" autocomplete="on">
-      <h1>ニッチ補助金ファインダー</h1>
-      ${message ? `<div class="error">${message}</div>` : ""}
+      <input type="hidden" name="next" value="${escapeHtml(safeNextPath(nextPath))}">
+      <h1>補助金クラウド</h1>
+      ${message ? `<div class="error">${escapeHtml(message)}</div>` : ""}
       <label for="password">パスワード</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
       <button type="submit">ログイン</button>
@@ -280,32 +771,45 @@ const renderLoginPage = (message = "") => `<!doctype html>
 </html>`;
 
 const authGuard = (req, res, next) => {
-  if (!AUTH_REQUIRED || req.path === "/login" || req.path === "/api/health") return next();
+  const isApiLikePath = req.path.startsWith("/api/") ||
+    req.path.startsWith("/explanation/api/") ||
+    req.path.startsWith("/internal/hearing/api/");
+  if (
+    !AUTH_REQUIRED ||
+    req.path === "/login" ||
+    req.path === "/api/health" ||
+    req.path === "/explanation/api/health" ||
+    req.path === "/api/session" ||
+    req.path === "/api/login" ||
+    req.path === "/api/logout"
+  ) return next();
   if (getValidSession(req)) return next();
-  if (req.path.startsWith("/api/")) return res.status(401).json({ ok: false, error: "Login required" });
-  return res.redirect(302, "/login");
+  if (isApiLikePath) return res.status(401).json({ ok: false, error: "Login required", message: "ログインが必要です。" });
+  return res.redirect(302, `/login?next=${encodeURIComponent(req.originalUrl || req.url || "/")}`);
 };
 
 app.use(securityHeaders);
 app.use(networkAccessGuard);
-app.use(express.json({ limit: "64kb", type: "application/json" }));
-app.use(express.urlencoded({ extended: false, limit: "16kb" }));
+app.use(express.json({ limit: "2mb", type: "application/json" }));
+app.use(express.urlencoded({ extended: false, limit: "200kb" }));
 
 app.get("/login", (req, res) => {
-  if (!AUTH_REQUIRED || getValidSession(req)) return res.redirect(302, "/");
+  const nextPath = safeNextPath(req.query.next);
+  if (!AUTH_REQUIRED || getValidSession(req)) return res.redirect(302, nextPath);
   res.setHeader("Cache-Control", "no-store");
-  res.type("html").send(renderLoginPage());
+  res.type("html").send(renderLoginPage(nextPath));
 });
 
 app.post("/login", rateLimit({ name: "login", windowMs: 5 * 60 * 1000, max: 20 }), (req, res) => {
-  if (!AUTH_REQUIRED) return res.redirect(302, "/");
+  const nextPath = safeNextPath(req.body?.next);
+  if (!AUTH_REQUIRED) return res.redirect(302, nextPath);
   const password = String(req.body?.password || "");
   if (verifyPassword(password)) {
     res.setHeader("Set-Cookie", createSession(req, "authenticated"));
-    return res.redirect(303, "/");
+    return res.redirect(303, nextPath);
   }
   res.setHeader("Cache-Control", "no-store");
-  return res.status(401).type("html").send(renderLoginPage("パスワードが違います。"));
+  return res.status(401).type("html").send(renderLoginPage(nextPath, "パスワードが違います。"));
 });
 
 app.post("/logout", (_req, res) => {
@@ -313,8 +817,303 @@ app.post("/logout", (_req, res) => {
   res.redirect(303, "/login");
 });
 
+app.get("/logout", (_req, res) => {
+  res.setHeader("Set-Cookie", clearSessionCookie());
+  res.redirect(303, "/login");
+});
+
+app.get("/api/session", (req, res) => {
+  res.json({
+    ok: true,
+    configured: !AUTH_REQUIRED || Boolean(APP_PASSWORD || APP_PASSWORD_HASH),
+    authenticated: Boolean(getValidSession(req))
+  });
+});
+
+app.post("/api/login", rateLimit({ name: "api-login", windowMs: 5 * 60 * 1000, max: 20 }), (req, res) => {
+  if (!AUTH_REQUIRED) return res.json({ ok: true });
+  const password = String(req.body?.password || "");
+  if (!verifyPassword(password)) {
+    return res.status(401).json({ ok: false, message: "パスワードが違います。" });
+  }
+  res.setHeader("Set-Cookie", createSession(req, "authenticated"));
+  return res.json({ ok: true });
+});
+
+app.post("/api/logout", (req, res) => {
+  res.setHeader("Set-Cookie", clearSessionCookie(req));
+  res.json({ ok: true });
+});
+
 app.use(authGuard);
 app.use("/api", apiAccessGuard, rateLimit({ name: "api", windowMs: 60 * 1000, max: 180 }));
+app.use("/explanation/api", apiAccessGuard, rateLimit({ name: "explanation-api", windowMs: 60 * 1000, max: 180 }));
+app.use("/internal/hearing/api", apiAccessGuard, rateLimit({ name: "hearing-api", windowMs: 60 * 1000, max: 240 }));
+
+app.get(["/internal", "/internal/"], (_req, res) => {
+  res.type("html").send(renderInternalHub());
+});
+
+app.get(["/internal/hearing", "/internal/hearing/"], (_req, res) => {
+  res.redirect(302, "/internal/hearing/company");
+});
+
+app.get(["/internal/hearing/company", "/internal/hearing/personal"], (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "internal", "hearing", "index.html"));
+});
+
+app.get("/internal/hearing/api/events", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.write(": connected\n\n");
+  hearingEventClients.add(res);
+  const keepAlive = setInterval(() => {
+    res.write(": ping\n\n");
+  }, 25_000);
+  req.on("close", () => {
+    clearInterval(keepAlive);
+    hearingEventClients.delete(res);
+  });
+});
+
+app.get("/internal/hearing/api/cases", async (req, res) => {
+  try {
+    const cases = await listHearingCases({ mode: req.query.mode, query: req.query.q });
+    res.json({
+      ok: true,
+      cases: cases.map(hearingCaseSummary),
+      storage: pgPool ? "postgres" : "file"
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "共有データを読み込めませんでした。" });
+  }
+});
+
+app.post("/internal/hearing/api/cases", async (req, res) => {
+  try {
+    const record = await saveNewHearingCase(req.body || {});
+    publishHearingCasesChanged(record);
+    res.status(201).json({ ok: true, case: record, storage: pgPool ? "postgres" : "file" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "共有データを保存できませんでした。" });
+  }
+});
+
+app.get("/internal/hearing/api/cases/:id", async (req, res) => {
+  try {
+    const record = await getHearingCase(req.params.id);
+    if (!record) return res.status(404).json({ ok: false, message: "共有データが見つかりません。" });
+    return res.json({ ok: true, case: record, storage: pgPool ? "postgres" : "file" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ ok: false, message: "共有データを読み込めませんでした。" });
+  }
+});
+
+app.put("/internal/hearing/api/cases/:id", async (req, res) => {
+  try {
+    const result = await updateHearingCase(req.params.id, req.body || {});
+    if (result.status === "missing") return res.status(404).json({ ok: false, message: "共有データが見つかりません。" });
+    if (result.status === "conflict") {
+      return res.status(409).json({
+        ok: false,
+        message: "他の方が先に保存しています。最新の共有データを読み込んでください。",
+        case: result.case
+      });
+    }
+    publishHearingCasesChanged(result.case);
+    return res.json({ ok: true, case: result.case, storage: pgPool ? "postgres" : "file" });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ ok: false, message: "共有データを保存できませんでした。" });
+  }
+});
+
+app.get(/^\/tasks$/, (_req, res) => {
+  res.redirect(302, "/tasks/");
+});
+
+app.get("/api/tasks", async (_req, res) => {
+  try {
+    const store = await readTaskStore();
+    res.json({ ok: true, ...store, storage: pgPool ? "postgres" : "file" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "タスクを読み込めませんでした。" });
+  }
+});
+
+app.post("/api/tasks", async (req, res) => {
+  try {
+    const task = normalizeTask({ ...req.body, id: crypto.randomUUID(), createdAt: Date.now() });
+    if (pgPool) {
+      await ensureTaskStore();
+      await pgPool.query(
+        "INSERT INTO shared_tasks (id, payload, updated_at) VALUES ($1, $2::jsonb, now())",
+        [task.id, JSON.stringify(task)]
+      );
+      const store = await readTaskStore();
+      return res.status(201).json({ ok: true, ...store, storage: "postgres" });
+    }
+    const store = await mutateTaskStore((tasks) => [...tasks, task]);
+    res.status(201).json({ ok: true, ...store, storage: "file" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "タスクを保存できませんでした。" });
+  }
+});
+
+app.put("/api/tasks/:id", async (req, res) => {
+  try {
+    const id = cleanTaskText(req.params.id, 120);
+    if (pgPool) {
+      await ensureTaskStore();
+      const current = await pgPool.query("SELECT payload FROM shared_tasks WHERE id = $1", [id]);
+      if (!current.rowCount) return res.status(404).json({ ok: false, message: "タスクが見つかりません。" });
+      const task = normalizeTask({ ...current.rows[0].payload, ...req.body, id, createdAt: current.rows[0].payload.createdAt });
+      await pgPool.query("UPDATE shared_tasks SET payload = $2::jsonb, updated_at = now() WHERE id = $1", [id, JSON.stringify(task)]);
+      const store = await readTaskStore();
+      return res.json({ ok: true, ...store, storage: "postgres" });
+    }
+    const store = await mutateTaskStore((tasks) => {
+      const index = tasks.findIndex((task) => task.id === id);
+      if (index === -1) return null;
+      const next = [...tasks];
+      next[index] = normalizeTask({ ...next[index], ...req.body, id, createdAt: next[index].createdAt });
+      return next;
+    });
+    if (!store) return res.status(404).json({ ok: false, message: "タスクが見つかりません。" });
+    res.json({ ok: true, ...store, storage: "file" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "タスクを更新できませんでした。" });
+  }
+});
+
+app.post("/api/tasks/:id/toggle", async (req, res) => {
+  try {
+    const id = cleanTaskText(req.params.id, 120);
+    if (pgPool) {
+      await ensureTaskStore();
+      const current = await pgPool.query("SELECT payload FROM shared_tasks WHERE id = $1", [id]);
+      if (!current.rowCount) return res.status(404).json({ ok: false, message: "タスクが見つかりません。" });
+      const task = normalizeTask({ ...current.rows[0].payload, done: !current.rows[0].payload.done });
+      await pgPool.query("UPDATE shared_tasks SET payload = $2::jsonb, updated_at = now() WHERE id = $1", [id, JSON.stringify(task)]);
+      const store = await readTaskStore();
+      return res.json({ ok: true, ...store, storage: "postgres" });
+    }
+    const store = await mutateTaskStore((tasks) => {
+      const index = tasks.findIndex((task) => task.id === id);
+      if (index === -1) return null;
+      const next = [...tasks];
+      next[index] = normalizeTask({ ...next[index], done: !next[index].done });
+      return next;
+    });
+    if (!store) return res.status(404).json({ ok: false, message: "タスクが見つかりません。" });
+    res.json({ ok: true, ...store, storage: "file" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "タスクを更新できませんでした。" });
+  }
+});
+
+app.delete("/api/tasks/:id", async (req, res) => {
+  try {
+    const id = cleanTaskText(req.params.id, 120);
+    if (pgPool) {
+      await ensureTaskStore();
+      const result = await pgPool.query("DELETE FROM shared_tasks WHERE id = $1", [id]);
+      if (!result.rowCount) return res.status(404).json({ ok: false, message: "タスクが見つかりません。" });
+      const store = await readTaskStore();
+      return res.json({ ok: true, ...store, storage: "postgres" });
+    }
+    const store = await mutateTaskStore((tasks) => {
+      const next = tasks.filter((task) => task.id !== id);
+      return next.length === tasks.length ? null : next;
+    });
+    if (!store) return res.status(404).json({ ok: false, message: "タスクが見つかりません。" });
+    res.json({ ok: true, ...store, storage: "file" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "タスクを削除できませんでした。" });
+  }
+});
+
+app.get("/explanation/api/health", (req, res) => {
+  res.json({
+    app: "explanation-converter",
+    version: "1.0.0",
+    ok: true,
+    mode: PUBLIC_ACCESS ? "cloud" : "local",
+    authRequired: AUTH_REQUIRED,
+    authenticated: Boolean(getValidSession(req)),
+    sharedDrafts: Boolean(pgPool)
+  });
+});
+
+app.post("/explanation/api/transform", (req, res) => {
+  try {
+    res.json(transformMemo(req.body || {}));
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, error: "transform_failed" });
+  }
+});
+
+app.get("/explanation/api/drafts", async (_req, res) => {
+  try {
+    if (!pgPool) return res.json({ ok: true, shared: false, drafts: [] });
+    await ensureExplanationDraftStore();
+    const result = await pgPool.query(
+      "SELECT id, payload, created_at FROM explanation_drafts ORDER BY created_at DESC LIMIT 50"
+    );
+    const drafts = result.rows.map((row) => normalizeExplanationDraft({
+      id: row.id,
+      ...row.payload,
+      createdAt: row.payload?.createdAt || new Date(row.created_at).toISOString()
+    }));
+    res.json({ ok: true, shared: true, drafts });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "下書きを読み込めませんでした。" });
+  }
+});
+
+app.post("/explanation/api/drafts", async (req, res) => {
+  try {
+    if (!pgPool) return res.status(503).json({ ok: false, message: "database_not_configured" });
+    await ensureExplanationDraftStore();
+    const draft = normalizeExplanationDraft(req.body || {});
+    await pgPool.query(
+      `INSERT INTO explanation_drafts (id, payload, created_at, updated_at)
+       VALUES ($1, $2::jsonb, $3, now())
+       ON CONFLICT (id) DO UPDATE SET payload = $2::jsonb, updated_at = now()`,
+      [draft.id, JSON.stringify(draft), draft.createdAt]
+    );
+    res.status(201).json({ ok: true, shared: true, draft });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "下書きを保存できませんでした。" });
+  }
+});
+
+app.delete("/explanation/api/drafts/:id", async (req, res) => {
+  try {
+    if (!pgPool) return res.status(503).json({ ok: false, message: "database_not_configured" });
+    await ensureExplanationDraftStore();
+    const id = cleanTaskText(req.params.id, 120);
+    await pgPool.query("DELETE FROM explanation_drafts WHERE id = $1", [id]);
+    res.json({ ok: true, shared: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "下書きを削除できませんでした。" });
+  }
+});
+
 app.use(express.static(path.join(__dirname, "public"), {
   dotfiles: "deny",
   fallthrough: true,

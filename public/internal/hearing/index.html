@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GP ヒアリング整理アプリ</title>
+  <link rel="stylesheet" href="/app-switcher.css?v=20260601b">
+  <link rel="stylesheet" href="/internal/hearing/styles.css?v=7">
+  <script defer src="/internal/hearing/vendor/xlsx.full.min.js"></script>
+  <script defer src="/internal/hearing/vendor/lucide.min.js"></script>
+  <script defer src="/internal/hearing/app.js?v=10"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">GP</div>
+      <div>
+        <p class="brand-kicker">GREEN PARTNERSHIP</p>
+        <h1>ヒアリング整理アプリ</h1>
+      </div>
+    </div>
+
+    <nav class="mode-links" aria-label="利用するシートの種類">
+      <a id="companyLink" href="/internal/hearing/company" data-tip="法人・会社向けの入力画面を開きます。">会社用</a>
+      <a id="personalLink" href="/internal/hearing/personal" data-tip="個人事業主向けの入力画面を開きます。">個人用</a>
+      <a id="logoutLink" href="/logout" data-tip="共有画面からログアウトします。クラウド利用時に、使い終わったら押してください。">ログアウト</a>
+    </nav>
+
+    <button id="helpButton" class="help-button" type="button" aria-label="ヘルプを開く" data-tip="操作方法と各ボタンの詳しい説明を開きます。">
+      <i data-lucide="circle-help" aria-hidden="true"></i>
+      <span>?</span>
+    </button>
+  </header>
+
+  <main class="app-shell">
+    <section class="input-pane" aria-label="ヒアリング入力">
+      <div class="action-bar">
+        <label class="tool-button" for="excelInput" data-tip="既存のヒアリングシート、またはこのアプリから出したExcelを読み込みます。">
+          <i data-lucide="file-up" aria-hidden="true"></i>
+          <span>Excelを読み込む</span>
+        </label>
+        <input id="excelInput" type="file" accept=".xlsx,.xls,.csv" hidden>
+
+        <button id="tocButton" class="tool-button" type="button" data-tip="入力項目の目次を開きます。項目を押すと、その入力場所へ移動します。">
+          <i data-lucide="list-tree" aria-hidden="true"></i>
+          <span>目次</span>
+        </button>
+
+        <button id="organizeButton" class="tool-button primary" type="button" data-tip="入力内容を見やすく整理し、不足している確認事項を表示します。">
+          <i data-lucide="sparkles" aria-hidden="true"></i>
+          <span>入力を整理</span>
+        </button>
+
+        <button id="exportButton" class="tool-button" type="button" data-tip="必須項目が未入力でもExcel出力できます。不足している確認事項は別シートにまとまります。">
+          <i data-lucide="file-down" aria-hidden="true"></i>
+          <span>Excel出力</span>
+        </button>
+
+        <button id="printButton" class="tool-button" type="button" data-tip="顧客確認用として見せやすい表示にして印刷、またはPDF保存します。">
+          <i data-lucide="printer" aria-hidden="true"></i>
+          <span>印刷表示</span>
+        </button>
+
+        <button id="newCaseButton" class="tool-button" type="button" data-tip="別の顧問先を新しく入力するため、画面を新規状態にします。共有保存済みデータは消えません。">
+          <i data-lucide="file-plus" aria-hidden="true"></i>
+          <span>新規作成</span>
+        </button>
+
+        <button id="saveButton" class="tool-button" type="button" data-tip="現在の入力内容を社内共有データとして保存します。他の方も一覧から開けます。">
+          <i data-lucide="database" aria-hidden="true"></i>
+          <span>共有保存</span>
+        </button>
+
+        <button id="loadButton" class="tool-button" type="button" data-tip="社内共有データの一覧を開きます。保存済みの顧問先を検索して呼び出せます。">
+          <i data-lucide="folder-open" aria-hidden="true"></i>
+          <span>共有一覧</span>
+        </button>
+
+        <button id="clearButton" class="tool-button danger" type="button" data-tip="入力欄を空にします。保存済みデータは消しません。">
+          <i data-lucide="eraser" aria-hidden="true"></i>
+          <span>入力クリア</span>
+        </button>
+      </div>
+
+      <div class="sheet-head">
+        <div>
+          <p id="modeBadge" class="mode-badge">会社用</p>
+          <h2 id="modeTitle">法人・会社向けヒアリングシート</h2>
+          <p class="sort-note">各大項目の中は、必須 → あると良い → 補足の順に並びます。</p>
+        </div>
+        <div class="sheet-status" aria-live="polite">
+          <span id="savedStatus">未保存</span>
+          <span id="updatedStatus">入力待ち</span>
+        </div>
+      </div>
+
+      <div id="formContainer" class="form-sections"></div>
+    </section>
+
+    <aside class="result-pane" aria-label="整理結果">
+      <section class="result-summary">
+        <div class="score-box">
+          <div class="score-ring">
+            <span id="scoreValue">0%</span>
+          </div>
+          <div>
+            <p>入力のそろい具合</p>
+            <strong id="scoreLabel">確認前</strong>
+          </div>
+        </div>
+        <div class="quick-facts">
+          <span id="subsidyChip">補助金種類 未選択</span>
+          <span id="entityChip">会社用</span>
+        </div>
+      </section>
+
+      <section class="result-block">
+        <div class="block-head">
+          <h3>不足している確認事項</h3>
+          <span id="missingCount">0件</span>
+        </div>
+        <ul id="missingList" class="check-list"></ul>
+      </section>
+
+      <section class="result-block">
+        <div class="block-head">
+          <h3>整理結果</h3>
+          <button id="copySummaryButton" class="mini-button" type="button" data-tip="整理結果を文章としてコピーします。">
+            <i data-lucide="copy" aria-hidden="true"></i>
+            <span>コピー</span>
+          </button>
+        </div>
+        <div id="summaryOutput" class="summary-output"></div>
+      </section>
+
+      <section class="result-block">
+        <div class="block-head">
+          <h3>必要書類の目安</h3>
+          <span id="documentModeLabel">会社用</span>
+        </div>
+        <ul id="documentList" class="document-list"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <div id="helpOverlay" class="modal-overlay" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modal-head">
+        <div>
+          <p class="brand-kicker">HELP</p>
+          <h2 id="helpTitle">操作方法とボタンの説明</h2>
+        </div>
+        <button id="closeHelpButton" class="icon-only" type="button" aria-label="ヘルプを閉じる" data-tip="ヘルプ画面を閉じます。">
+          <i data-lucide="x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="help-content">
+        <section>
+          <h3>基本の使い方</h3>
+          <ol>
+            <li>会社用または個人用のURLを開きます。法人・会社は会社用、個人事業主は個人用を使います。</li>
+            <li>既存のExcelがある場合は「Excelを読み込む」を押します。まだない場合は、そのまま入力を始めます。</li>
+            <li>お客様に確認しながら、分かる範囲で入力します。未確定の内容は空欄でもかまいません。</li>
+            <li>「入力を整理」を押すと、事業の概要、課題、補助事業の内容、次に確認したいことが右側にまとまります。</li>
+            <li>社内で続きから編集したい場合は「共有保存」を押します。他の方は「共有一覧」から同じ顧問先データを開けます。</li>
+            <li>Excelで渡したい場合は「Excel出力」を押します。必須項目が未入力でも出力できます。顧客確認用に見せたい場合は「印刷表示」を使います。</li>
+          </ol>
+        </section>
+        <section id="buttonHelpList" class="button-help-list"></section>
+        <section>
+          <h3>入力時の考え方</h3>
+          <p>きれいな文章で入力する必要はありません。箇条書き、聞き取ったままのメモ、未確定の金額でも大丈夫です。大切なのは、あとから申請書を作る人が「なぜこの投資をするのか」「何がどう良くなるのか」「数字でどのくらい変わるのか」を追えることです。</p>
+          <p>GビズIDなどのログイン情報については、IDの準備状況だけを記録してください。パスワードは安全のため、このアプリでは入力欄を作っていません。</p>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="tocOverlay" class="drawer-overlay" hidden>
+    <aside class="toc-drawer" role="dialog" aria-modal="true" aria-labelledby="tocTitle">
+      <div class="toc-head">
+        <div>
+          <p class="brand-kicker">CONTENTS</p>
+          <h2 id="tocTitle">入力項目の目次</h2>
+        </div>
+        <button id="closeTocButton" class="icon-only" type="button" aria-label="目次を閉じる" data-tip="目次を閉じます。">
+          <i data-lucide="x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <p class="toc-lead">確認したい項目を押すと、その入力欄まで移動します。大項目は開いたり閉じたりできます。</p>
+      <nav id="tocList" class="toc-list" aria-label="入力項目の目次"></nav>
+    </aside>
+  </div>
+
+  <div id="caseOverlay" class="drawer-overlay" hidden>
+    <aside class="case-drawer" role="dialog" aria-modal="true" aria-labelledby="caseDrawerTitle">
+      <div class="toc-head">
+        <div>
+          <p class="brand-kicker">SHARED DATA</p>
+          <h2 id="caseDrawerTitle">共有データ一覧</h2>
+        </div>
+        <button id="closeCasesButton" class="icon-only" type="button" aria-label="共有一覧を閉じる" data-tip="共有データ一覧を閉じます。">
+          <i data-lucide="x" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="case-tools">
+        <label class="case-search">
+          <span>検索</span>
+          <input id="caseSearchInput" type="search" placeholder="会社名・屋号、補助金、担当者で検索">
+        </label>
+        <button id="refreshCasesButton" class="mini-button" type="button" data-tip="共有データ一覧を最新の状態にします。">
+          <i data-lucide="refresh-cw" aria-hidden="true"></i>
+          <span>更新</span>
+        </button>
+      </div>
+      <p id="caseDrawerStatus" class="case-drawer-status">共有データを読み込みます。</p>
+      <div id="caseList" class="case-list"></div>
+    </aside>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/app-switcher.js?v=20260601b" defer></script>
+</body>
+</html>

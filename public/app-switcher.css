@@ -1,0 +1,200 @@
+.gp-app-switcher-button {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2147483000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid #b8d0c8;
+  border-radius: 999px;
+  background: #0f766e;
+  color: #fff;
+  padding: 10px 16px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .20);
+  font: 700 14px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.gp-app-switcher-button:hover {
+  background: #115e59;
+}
+
+.gp-app-switcher-button:focus-visible,
+.gp-app-switcher-close:focus-visible,
+.gp-app-switcher-card:focus-visible {
+  outline: 3px solid rgba(20, 184, 166, .35);
+  outline-offset: 3px;
+}
+
+.gp-app-switcher-icon {
+  display: grid;
+  grid-template-columns: repeat(2, 5px);
+  gap: 3px;
+}
+
+.gp-app-switcher-icon span {
+  width: 5px;
+  height: 5px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.gp-app-switcher-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483001;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, .34);
+}
+
+.gp-app-switcher-overlay[hidden] {
+  display: none;
+}
+
+.gp-app-switcher-window {
+  width: min(640px, 100%);
+  max-height: min(680px, calc(100vh - 36px));
+  overflow: auto;
+  border: 1px solid #d5e2de;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .24);
+  color: #1f2f2b;
+}
+
+.gp-app-switcher-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px;
+  border-bottom: 1px solid #e2ebe8;
+  background: #fff;
+}
+
+.gp-app-switcher-kicker {
+  margin: 0 0 4px;
+  color: #60706b;
+  font: 700 12px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+.gp-app-switcher-title {
+  margin: 0;
+  font: 800 20px/1.3 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+.gp-app-switcher-close {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #d5e2de;
+  border-radius: 8px;
+  background: #fff;
+  color: #253a35;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gp-app-switcher-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+
+.gp-app-switcher-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 104px;
+  border: 1px solid #d8e5e1;
+  border-radius: 8px;
+  background: #fbfdfc;
+  color: #18302b;
+  padding: 14px;
+  text-decoration: none;
+  font: 800 15px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+.gp-app-switcher-card:hover {
+  border-color: #7fb7a8;
+  background: #eef9f5;
+}
+
+.gp-app-switcher-card[aria-current="page"] {
+  border-color: #0f766e;
+  background: #e6f6f2;
+}
+
+.gp-app-switcher-badge {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  background: #0f766e;
+  color: #fff;
+  font-size: 13px;
+}
+
+.gp-app-switcher-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.gp-app-switcher-copy strong {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.gp-app-switcher-copy span {
+  color: #5b6b66;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.gp-app-switcher-copy em {
+  width: max-content;
+  border-radius: 999px;
+  background: #d9f2e8;
+  color: #0f6b4f;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  .gp-app-switcher-button {
+    right: 12px;
+    bottom: 12px;
+    padding: 10px 13px;
+  }
+
+  .gp-app-switcher-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .gp-app-switcher-button,
+  .gp-app-switcher-overlay {
+    display: none !important;
+  }
+}

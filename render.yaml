@@ -1,11 +1,11 @@
 services:
   - type: web
-    name: niche-hojokin-finder
+    name: hojokin-app-cloud
     env: node
     plan: starter
     buildCommand: npm ci --omit=dev
     startCommand: node server.js
-    autoDeploy: false
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
@@ -17,13 +17,19 @@ services:
         value: "1"
       - key: HOST
         value: 0.0.0.0
-      - key: APP_USER
-        sync: false
       - key: APP_PASSWORD
         sync: false
       - key: SESSION_SECRET
         generateValue: true
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: hojokin-app-shared-db
+          property: connectionString
       - key: DATABASE_SSL
         value: "0"
+
+databases:
+  - name: hojokin-app-shared-db
+    plan: basic-256mb
+    databaseName: hojokin_app
+    user: hojokin_app

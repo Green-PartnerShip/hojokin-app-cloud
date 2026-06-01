@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>説明変換ワークベンチ</title>
+    <link rel="stylesheet" href="/app-switcher.css?v=20260601b">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">文</span>
+          <div>
+            <h1>説明変換ワークベンチ</h1>
+            <p>雑な業務メモを、相手に合わせた報告・説明文へ整えます。</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <span id="serverMode" class="status-pill">起動確認中</span>
+          <button
+            id="logoutButton"
+            class="ghost-button"
+            type="button"
+            hidden
+            data-tooltip="ログイン状態を終了し、ログイン画面へ戻ります。"
+            data-testid="logout-button"
+          >ログアウト</button>
+          <button
+            id="helpButton"
+            class="icon-button"
+            type="button"
+            aria-label="ヘルプを開く"
+            data-tooltip="詳しい操作方法と、各ボタンでできることを確認します。"
+            data-testid="help-button"
+          >?</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel input-panel" aria-labelledby="inputTitle">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Input</p>
+              <h2 id="inputTitle">元メモ</h2>
+            </div>
+            <button
+              id="sampleButton"
+              class="secondary-button"
+              type="button"
+              data-tooltip="実際の入力イメージを確認できるサンプル文を入れます。"
+              data-testid="sample-button"
+            >サンプル</button>
+          </div>
+
+          <label class="field-label" for="memoInput">変換したいメモ</label>
+          <textarea id="memoInput" data-testid="memo-input" spellcheck="false" placeholder="例:
+A社の件、API連携でエラー。
+原因は認証トークン期限切れの可能性。
+トークン再発行で復旧済み。
+ただし再発する可能性あり。
+恒久対応として自動更新を入れたい。
+工数は半日程度。"></textarea>
+
+          <div class="button-row">
+            <button
+              id="convertButton"
+              class="primary-button"
+              type="button"
+              data-tooltip="入力メモと選択条件をもとに、相手向けの説明文を作成します。"
+              data-testid="convert-button"
+            >変換する</button>
+            <button
+              id="clearInputButton"
+              class="ghost-button"
+              type="button"
+              data-tooltip="左側のメモ入力欄だけを空にします。出力欄は残ります。"
+              data-testid="clear-input-button"
+            >入力クリア</button>
+          </div>
+        </section>
+
+        <aside class="panel settings-panel" aria-labelledby="settingsTitle">
+          <div class="panel-heading compact">
+            <div>
+              <p class="eyebrow">Settings</p>
+              <h2 id="settingsTitle">変換条件</h2>
+            </div>
+          </div>
+
+          <label class="field-label" for="audienceSelect">相手</label>
+          <select id="audienceSelect" data-testid="audience-select">
+            <option value="boss">上司</option>
+            <option value="customer">お客様</option>
+            <option value="team">チーム</option>
+            <option value="executive">経営層</option>
+            <option value="partner">協力会社</option>
+          </select>
+
+          <label class="field-label" for="purposeSelect">用途</label>
+          <select id="purposeSelect" data-testid="purpose-select">
+            <option value="report">状況報告</option>
+            <option value="consult">相談</option>
+            <option value="apology">お詫び</option>
+            <option value="request">依頼</option>
+            <option value="progress">進捗共有</option>
+            <option value="trouble">トラブル説明</option>
+          </select>
+
+          <label class="field-label" for="toneSelect">トーン</label>
+          <select id="toneSelect" data-testid="tone-select">
+            <option value="polite">丁寧</option>
+            <option value="formal">かため</option>
+            <option value="soft">やわらかめ</option>
+            <option value="concise">簡潔</option>
+          </select>
+
+          <label class="field-label" for="formatSelect">出力形式</label>
+          <select id="formatSelect" data-testid="format-select">
+            <option value="email">メール</option>
+            <option value="chat">チャット</option>
+            <option value="bullets">箇条書き</option>
+            <option value="report">報告書風</option>
+          </select>
+
+          <label class="field-label" for="detailSelect">詳しさ</label>
+          <select id="detailSelect" data-testid="detail-select">
+            <option value="standard">標準</option>
+            <option value="brief">短め</option>
+            <option value="detailed">詳しめ</option>
+          </select>
+
+          <div class="settings-actions">
+            <button
+              id="saveDraftButton"
+              class="secondary-button full"
+              type="button"
+              data-tooltip="入力内容、選択条件、出力結果をこのブラウザに保存します。"
+              data-testid="save-draft-button"
+            >下書き保存</button>
+            <button
+              id="openDraftsButton"
+              class="ghost-button full"
+              type="button"
+              data-tooltip="保存した下書きの一覧を開き、過去の内容を復元します。"
+              data-testid="open-drafts-button"
+            >保存済みを開く</button>
+          </div>
+        </aside>
+
+        <section class="panel output-panel" aria-labelledby="outputTitle">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Output</p>
+              <h2 id="outputTitle">変換結果</h2>
+            </div>
+            <div class="output-actions">
+              <button
+                id="shortenButton"
+                class="secondary-button"
+                type="button"
+                data-tooltip="変換結果を、要点が残る範囲で短く整えます。"
+                data-testid="shorten-button"
+              >短く整える</button>
+              <button
+                id="copyButton"
+                class="secondary-button"
+                type="button"
+                data-tooltip="変換結果をクリップボードへコピーします。メールやチャットへ貼り付けられます。"
+                data-testid="copy-button"
+              >コピー</button>
+              <button
+                id="clearOutputButton"
+                class="ghost-button"
+                type="button"
+                data-tooltip="右側の変換結果だけを空にします。入力メモは残ります。"
+                data-testid="clear-output-button"
+              >出力クリア</button>
+            </div>
+          </div>
+
+          <textarea id="outputText" data-testid="output-text" spellcheck="false" readonly placeholder="ここに変換結果が表示されます。"></textarea>
+          <div id="messageBar" class="message-bar" role="status" aria-live="polite"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+
+    <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">Help</p>
+          <h2 id="helpTitle">操作方法とボタンの詳しい説明</h2>
+        </div>
+        <button
+          id="closeHelpButton"
+          class="icon-button"
+          type="button"
+          aria-label="ヘルプを閉じる"
+          data-tooltip="ヘルプ画面を閉じて、通常の入力画面へ戻ります。"
+        >×</button>
+      </div>
+
+      <div class="help-content">
+        <section>
+          <h3>基本の流れ</h3>
+          <ol>
+            <li>左側の「元メモ」に、自分用の雑なメモや箇条書きを貼り付けます。</li>
+            <li>中央の「変換条件」で、誰に向けて、何の目的で、どのくらい丁寧に出すかを選びます。</li>
+            <li>「変換する」を押すと、右側に上司・お客様・チームなどに合わせた説明文が出ます。</li>
+            <li>必要に応じて「短く整える」や「コピー」を使い、メールやチャットへ貼り付けます。</li>
+          </ol>
+        </section>
+
+        <section>
+          <h3>各ボタンでできること</h3>
+          <div class="help-grid">
+            <article>
+              <h4>? ヘルプ</h4>
+              <p>右上端のヘルプボタンです。この画面を開き、操作の流れ、各ボタンの意味、変換条件の選び方を確認できます。初めて使う人や、お客様に画面を説明するときの確認にも使えます。</p>
+            </article>
+            <article>
+              <h4>サンプル</h4>
+              <p>元メモ欄に業務メモの例を入れます。どの程度の粗さのメモから変換できるかを確認したいときに使います。既に入力中の内容がある場合は上書きされます。</p>
+            </article>
+            <article>
+              <h4>変換する</h4>
+              <p>入力されたメモを読み取り、選択した相手・用途・トーン・出力形式に合わせて文章を作成します。上司向けなら判断材料、お客様向けなら丁寧さと安心感、チーム向けなら作業しやすさを優先して整えます。</p>
+            </article>
+            <article>
+              <h4>入力クリア</h4>
+              <p>元メモ欄だけを空にします。変換結果や選択条件は残るため、出力内容を見ながら次のメモを入力し直したい場合に便利です。</p>
+            </article>
+            <article>
+              <h4>短く整える</h4>
+              <p>右側に出ている変換結果を、要点を残したまま短くします。チャット投稿前、上司への簡易共有、お客様への一次報告など、長すぎる文章を少し絞りたいときに使います。</p>
+            </article>
+            <article>
+              <h4>コピー</h4>
+              <p>変換結果をクリップボードにコピーします。Outlook、Teams、Slack、社内ポータルなどに貼り付ける前提のボタンです。コピー後は画面下部に完了メッセージが出ます。</p>
+            </article>
+            <article>
+              <h4>出力クリア</h4>
+              <p>右側の変換結果だけを空にします。元メモは残るため、条件を変えて再作成したいときや、出力欄を見せたくない状態に戻したいときに使えます。</p>
+            </article>
+            <article>
+              <h4>下書き保存</h4>
+              <p>入力メモ、変換条件、出力結果をこのブラウザ内に保存します。途中まで整えた説明文を後で再利用したいとき、同じ案件の報告文を何度か更新したいときに使います。</p>
+            </article>
+            <article>
+              <h4>保存済みを開く</h4>
+              <p>保存した下書きの一覧を開きます。一覧から選ぶと、入力メモ・条件・出力結果が復元されます。古い下書きは一覧から削除できます。</p>
+            </article>
+          </div>
+        </section>
+
+        <section>
+          <h3>変換条件の選び方</h3>
+          <p><strong>相手</strong>は文章の見せ方を大きく変えます。上司なら「現状・リスク・次の対応」、お客様なら「ご不便への配慮・現在の状態・今後の対応」、チームなら「状況・TODO・注意点」が出やすくなります。</p>
+          <p><strong>用途</strong>は文章の目的です。状況報告、相談、お詫び、依頼、進捗共有、トラブル説明から選びます。同じメモでも、お詫びなら丁寧さ、相談なら判断してほしい点、依頼なら相手にお願いする行動が強調されます。</p>
+          <p><strong>トーン</strong>は文体です。丁寧は標準、かためは社外文書寄り、やわらかめは圧を弱めたいとき、簡潔はチャットや短い報告向けです。</p>
+          <p><strong>出力形式</strong>は貼り付け先に合わせて選びます。メール、チャット、箇条書き、報告書風の4種類を用意しています。</p>
+          <p><strong>詳しさ</strong>は情報量の調整です。短めは一次報告、標準は普段使い、詳しめは背景や補足も残したい場面に向いています。</p>
+        </section>
+
+        <section>
+          <h3>マウス停止時の簡易説明</h3>
+          <p>各ボタンの上でマウスポインタを少し止めると、そのボタンの短い説明が表示されます。ポインタを外すと説明は消えます。クリック前に「このボタンは何をするのか」を確認できるため、社内展開時にも迷いにくい設計です。</p>
+        </section>
+
+        <section>
+          <h3>社内利用時の注意</h3>
+          <p>このクラウド版は、URLと共有パスワードを知っている人がブラウザから利用できます。下書き保存は利用中のブラウザ内に保存されます。機密情報を扱う場合は、社内ルールに合わせて入力内容、保存期間、共有範囲を決めてください。</p>
+        </section>
+      </div>
+    </dialog>
+
+    <dialog id="draftDialog" class="draft-dialog" aria-labelledby="draftTitle">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">Drafts</p>
+          <h2 id="draftTitle">保存済みの下書き</h2>
+        </div>
+        <button
+          id="closeDraftButton"
+          class="icon-button"
+          type="button"
+          aria-label="下書きを閉じる"
+          data-tooltip="下書き一覧を閉じます。"
+        >×</button>
+      </div>
+      <div id="draftList" class="draft-list"></div>
+    </dialog>
+
+    <script src="./app.js" defer></script>
+    <script src="/app-switcher.js?v=20260601b" defer></script>
+  </body>
+</html>
