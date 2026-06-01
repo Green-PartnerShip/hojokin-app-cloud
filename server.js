@@ -66,13 +66,16 @@ let hearingStoreReady = null;
 let hearingFileQueue = Promise.resolve();
 const TASKS_FILE = path.join(APP_DATA_DIR, "shared-tasks.json");
 const EXPLANATION_DRAFTS_FILE = path.join(APP_DATA_DIR, "explanation-drafts.json");
+const PHRASE_STOCK_FILE = path.join(APP_DATA_DIR, "phrase-stock-templates.json");
 const SHARED_HISTORY_FILE = path.join(APP_DATA_DIR, "shared-search-history.json");
 const SAVED_SUBSIDIES_FILE = path.join(APP_DATA_DIR, "saved-subsidies.json");
 const GP_STORE_FILE = path.join(APP_DATA_DIR, "gp-shared-store.json");
 const GP_BACKUPS_FILE = path.join(APP_DATA_DIR, "gp-shared-backups.json");
+const PHRASE_STOCK_STORE_ID = "main";
 let taskStoreReady = null;
 let taskFileQueue = Promise.resolve();
 let explanationDraftFileQueue = Promise.resolve();
+let phraseStockFileQueue = Promise.resolve();
 let sharedDataFileQueue = Promise.resolve();
 let gpFileQueue = Promise.resolve();
 
@@ -289,6 +292,114 @@ const writeJsonFile = async (filePath, value) => {
   await fs.promises.writeFile(temporaryFile, `${JSON.stringify(value, null, 2)}\n`, "utf8");
   await fs.promises.rename(temporaryFile, filePath);
   return value;
+};
+
+const emptyPhraseStockStore = () => ({ revision: 0, updatedAt: "", templates: [] });
+
+const normalizePhraseStockStore = (value = {}) => ({
+  revision: Number(value.revision || 0),
+  updatedAt: value.updatedAt || value.updated_at || "",
+  templates: Array.isArray(value.templates) ? value.templates : []
+});
+
+const mergePhraseStockTemplates = (current, incoming, deletedIds = []) => {
+  const deleted = new Set(deletedIds.map(String));
+  const merged = new Map();
+
+  current.forEach((template) => {
+    const id = String(template?.id || "");
+    if (id && !deleted.has(id)) merged.set(id, template);
+  });
+  incoming.forEach((template) => {
+    const id = String(template?.id || "");
+    if (id && !deleted.has(id)) merged.set(id, template);
+  });
+
+  return [...merged.values()].sort((a, b) =>
+    String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || ""))
+  );
+};
+
+const ensurePhraseStockStore = async () => {
+  if (!pgPool) return;
+  await pgPool.query(`
+    CREATE TABLE IF NOT EXISTS phrase_stock_state (
+      id TEXT PRIMARY KEY,
+      revision INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      templates JSONB NOT NULL DEFAULT '[]'::jsonb
+    )
+  `);
+};
+
+const readPhraseStockStore = async () => {
+  if (!pgPool) {
+    return normalizePhraseStockStore(await readJsonFile(PHRASE_STOCK_FILE, emptyPhraseStockStore()));
+  }
+  await ensurePhraseStockStore();
+  const result = await pgPool.query(
+    "SELECT revision, updated_at, templates FROM phrase_stock_state WHERE id = $1",
+    [PHRASE_STOCK_STORE_ID]
+  );
+  const row = result.rows[0];
+  if (!row) return emptyPhraseStockStore();
+  return normalizePhraseStockStore({
+    revision: row.revision,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : "",
+    templates: row.templates
+  });
+};
+
+const savePhraseStockStore = async ({ templates, baseRevision, deletedIds = [], replace = false }) => {
+  const incoming = Array.isArray(templates) ? templates.slice(0, 1000) : [];
+  if (!pgPool) {
+    const run = phraseStockFileQueue.then(async () => {
+      const current = normalizePhraseStockStore(await readJsonFile(PHRASE_STOCK_FILE, emptyPhraseStockStore()));
+      const stale = Number.isFinite(Number(baseRevision)) && Number(baseRevision) < current.revision;
+      const nextTemplates = stale && !replace ? mergePhraseStockTemplates(current.templates, incoming, deletedIds) : incoming;
+      const next = {
+        revision: current.revision + 1,
+        updatedAt: new Date().toISOString(),
+        templates: nextTemplates
+      };
+      await writeJsonFile(PHRASE_STOCK_FILE, next);
+      return { ...next, merged: stale && !replace, storage: "file" };
+    });
+    phraseStockFileQueue = run.catch(() => {});
+    return run;
+  }
+
+  await ensurePhraseStockStore();
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    const currentResult = await client.query(
+      "SELECT revision, updated_at, templates FROM phrase_stock_state WHERE id = $1 FOR UPDATE",
+      [PHRASE_STOCK_STORE_ID]
+    );
+    const current = normalizePhraseStockStore(currentResult.rows[0] || emptyPhraseStockStore());
+    const stale = Number.isFinite(Number(baseRevision)) && Number(baseRevision) < current.revision;
+    const nextTemplates = stale && !replace ? mergePhraseStockTemplates(current.templates, incoming, deletedIds) : incoming;
+    const next = {
+      revision: current.revision + 1,
+      updatedAt: new Date().toISOString(),
+      templates: nextTemplates
+    };
+    await client.query(
+      `INSERT INTO phrase_stock_state (id, revision, updated_at, templates)
+       VALUES ($1, $2, $3, $4::jsonb)
+       ON CONFLICT (id)
+       DO UPDATE SET revision = EXCLUDED.revision, updated_at = EXCLUDED.updated_at, templates = EXCLUDED.templates`,
+      [PHRASE_STOCK_STORE_ID, next.revision, next.updatedAt, JSON.stringify(next.templates)]
+    );
+    await client.query("COMMIT");
+    return { ...next, merged: stale && !replace, storage: "postgres" };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 const normalizeTask = (task = {}) => {
@@ -737,8 +848,8 @@ const renderInternalHub = () => `<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>統合メニュー - 補助金クラウド</title>
-  <link rel="stylesheet" href="/app-switcher.css?v=20260602g">
-  <script defer src="/app-switcher.js?v=20260602g"></script>
+  <link rel="stylesheet" href="/app-switcher.css?v=20260602h">
+  <script defer src="/app-switcher.js?v=20260602h"></script>
   <style>
     body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f7;color:#18221f}
     .wrap{max-width:1040px;margin:0 auto;padding:28px}
@@ -773,6 +884,11 @@ const renderInternalHub = () => `<!doctype html>
           <span class="tag">業務管理</span>
           <strong>GP業務管理</strong>
           <span>顧問先、案件進捗、チャット相談、書類ひな形、月次レポートを管理します。</span>
+        </a>
+        <a class="tile" href="/phrase-stock/">
+          <span class="tag">文章共有</span>
+          <strong>定型文ストック</strong>
+          <span>社内共有の定型文を検索・追加・編集し、自然な日本語文をすぐ使える形にします。</span>
         </a>
         <a class="tile" href="/internal/hearing/company">
           <span class="tag">共有保存</span>
@@ -835,12 +951,16 @@ const renderLoginPage = (nextPath = "/", message = "") => `<!doctype html>
 const authGuard = (req, res, next) => {
   const isApiLikePath = req.path.startsWith("/api/") ||
     req.path.startsWith("/explanation/api/") ||
-    req.path.startsWith("/internal/hearing/api/");
+    req.path.startsWith("/internal/hearing/api/") ||
+    req.path.startsWith("/phrase-stock/api/");
   if (
     !AUTH_REQUIRED ||
     req.path === "/login" ||
     req.path === "/api/health" ||
     req.path === "/explanation/api/health" ||
+    req.path === "/phrase-stock/api/session" ||
+    req.path === "/phrase-stock/api/login" ||
+    req.path === "/phrase-stock/api/logout" ||
     req.path === "/api/session" ||
     req.path === "/api/login" ||
     req.path === "/api/logout"
@@ -911,6 +1031,74 @@ app.use(authGuard);
 app.use("/api", apiAccessGuard, rateLimit({ name: "api", windowMs: 60 * 1000, max: 180 }));
 app.use("/explanation/api", apiAccessGuard, rateLimit({ name: "explanation-api", windowMs: 60 * 1000, max: 180 }));
 app.use("/internal/hearing/api", apiAccessGuard, rateLimit({ name: "hearing-api", windowMs: 60 * 1000, max: 240 }));
+app.use("/phrase-stock/api", apiAccessGuard, rateLimit({ name: "phrase-stock-api", windowMs: 60 * 1000, max: 240 }));
+
+app.get(/^\/phrase-stock$/, (_req, res) => {
+  res.redirect(302, "/phrase-stock/");
+});
+
+app.get("/phrase-stock/api/session", (req, res) => {
+  const session = getValidSession(req);
+  res.json({
+    ok: true,
+    authenticated: Boolean(session),
+    authRequired: AUTH_REQUIRED,
+    authConfigured: !AUTH_REQUIRED || Boolean(APP_PASSWORD || APP_PASSWORD_HASH),
+    user: session?.user || null,
+    shared: true
+  });
+});
+
+app.post("/phrase-stock/api/login", rateLimit({ name: "phrase-stock-login", windowMs: 5 * 60 * 1000, max: 20 }), (req, res) => {
+  if (!AUTH_REQUIRED) return res.json({ ok: true, user: "local", authRequired: false });
+  const password = String(req.body?.password || "");
+  if (!verifyPassword(password)) {
+    return res.status(401).json({ ok: false, message: "ログイン情報が正しくありません。" });
+  }
+  res.setHeader("Set-Cookie", createSession(req, "authenticated"));
+  return res.json({ ok: true, user: "authenticated", authRequired: true });
+});
+
+app.post("/phrase-stock/api/logout", (req, res) => {
+  res.setHeader("Set-Cookie", clearSessionCookie(req));
+  res.json({ ok: true });
+});
+
+app.get("/phrase-stock/api/templates", async (_req, res) => {
+  try {
+    const store = await readPhraseStockStore();
+    res.json({ ok: true, shared: true, storage: pgPool ? "postgres" : "file", ...store });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "定型文を読み込めませんでした。" });
+  }
+});
+
+app.put("/phrase-stock/api/templates", async (req, res) => {
+  try {
+    if (!Array.isArray(req.body?.templates)) {
+      return res.status(400).json({ ok: false, message: "保存データの形式が正しくありません。" });
+    }
+    const saved = await savePhraseStockStore({
+      templates: req.body.templates,
+      baseRevision: req.body.baseRevision ?? req.body.revision,
+      deletedIds: Array.isArray(req.body.deletedIds) ? req.body.deletedIds : [],
+      replace: req.body.replace === true
+    });
+    res.json({
+      ok: true,
+      shared: true,
+      savedAt: saved.updatedAt,
+      revision: saved.revision,
+      merged: Boolean(saved.merged),
+      storage: saved.storage,
+      templates: saved.templates
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "定型文を保存できませんでした。" });
+  }
+});
 
 app.get("/app-switch", (_req, res) => {
   res.type("html").send(`<!doctype html>
@@ -949,6 +1137,14 @@ app.get("/app-switch", (_req, res) => {
         </div>
       </section>
       <section class="tile">
+        <h2>定型文ストック</h2>
+        <p>社内共有の定型文を検索・追加・編集し、自然な日本語文をすぐ使える形にします。</p>
+        <div class="actions">
+          <a class="button open" href="/phrase-stock/">定型文ストックを開く</a>
+          <button type="button" onclick="window.open('/phrase-stock/','phraseStock','width=1280,height=860,noopener')">別ウィンドウで開く</button>
+        </div>
+      </section>
+      <section class="tile">
         <h2>統合メニュー</h2>
         <p>補助金検索、ヒアリング、説明変換、タスク管理の入口へ戻ります。</p>
         <div class="actions">
@@ -956,7 +1152,7 @@ app.get("/app-switch", (_req, res) => {
         </div>
       </section>
     </div>
-    <div class="small">トップ画面からも「アプリ切替」または「GP業務管理」ボタンで開けます。</div>
+    <div class="small">トップ画面からも「アプリ切替」で各アプリへ移動できます。</div>
   </main>
 </body>
 </html>`);

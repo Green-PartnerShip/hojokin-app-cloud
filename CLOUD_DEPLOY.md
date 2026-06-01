@@ -8,6 +8,7 @@
 - 社内メニュー: `/internal`
 - ヒアリング整理（会社用）: `/internal/hearing/company`
 - ヒアリング整理（個人用）: `/internal/hearing/personal`
+- 定型文ストック: `/phrase-stock/`
 - 業務タスクボード: `/tasks/`
 - 説明変換ワークベンチ: `/explanation/`
 

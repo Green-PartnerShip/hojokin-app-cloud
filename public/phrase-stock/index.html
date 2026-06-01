@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#19605d" />
+    <title>定型文ストック</title>
+    <link rel="stylesheet" href="/app-switcher.css?v=20260602h" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script defer src="/app-switcher.js?v=20260602h"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"><i data-lucide="message-square-text"></i></span>
+          <div>
+            <h1>定型文ストック</h1>
+            <p>すぐ送れる、自然な日本語</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button class="ghost-button" type="button" data-action="open-app-switcher" title="アプリ切替" aria-label="アプリ切替">
+            <i data-lucide="app-window"></i>
+            <span>アプリ切替</span>
+          </button>
+          <button class="icon-button" type="button" data-action="export-json" title="控え保存" aria-label="控え保存">
+            <i data-lucide="download"></i>
+          </button>
+          <label class="icon-button file-button" title="控え読込" aria-label="控え読込">
+            <i data-lucide="upload"></i>
+            <input id="importFile" type="file" accept="application/json" />
+          </label>
+          <button class="icon-button" type="button" data-action="open-help" title="ヘルプ" aria-label="ヘルプ">
+            <i data-lucide="circle-help"></i>
+          </button>
+          <button id="logoutButton" class="ghost-button" type="button" data-action="logout" hidden>
+            <i data-lucide="log-out"></i>
+            <span>ログアウト</span>
+          </button>
+          <button class="ghost-button" type="button" data-action="copy-claude">
+            <i data-lucide="sparkles"></i>
+            <span>Claude用</span>
+          </button>
+          <button class="ghost-button" type="button" data-action="open-writer">
+            <i data-lucide="wand-sparkles"></i>
+            <span>作成</span>
+          </button>
+          <button class="primary-button" type="button" data-action="new-template">
+            <i data-lucide="plus"></i>
+            <span>追加</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="sidebar" aria-label="絞り込み">
+          <div class="search-box">
+            <i data-lucide="search" aria-hidden="true"></i>
+            <input id="searchInput" type="search" placeholder="タイトル・本文・タグで検索" autocomplete="off" />
+          </div>
+
+          <section class="control-group">
+            <h2>種類</h2>
+            <div class="segmented two" role="tablist" aria-label="種類切替">
+              <button type="button" data-domain="general" aria-selected="false">
+                <i data-lucide="briefcase-business"></i><span>通常用</span>
+              </button>
+              <button type="button" data-domain="subsidy" aria-selected="true">
+                <i data-lucide="landmark"></i><span>補助金用</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="control-group">
+            <h2>表示</h2>
+            <div class="segmented" role="tablist" aria-label="表示切替">
+              <button type="button" data-view="all" aria-selected="true">
+                <i data-lucide="layers-3"></i><span>すべて</span>
+              </button>
+              <button type="button" data-view="favorite" aria-selected="false">
+                <i data-lucide="star"></i><span>お気に入り</span>
+              </button>
+              <button type="button" data-view="recent" aria-selected="false">
+                <i data-lucide="history"></i><span>最近</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="control-group">
+            <h2>条件</h2>
+            <label>
+              用途
+              <select id="categoryFilter"></select>
+            </label>
+            <label>
+              温度感
+              <select id="toneFilter"></select>
+            </label>
+            <label>
+              宛先
+              <select id="recipientFilter"></select>
+            </label>
+            <label>
+              並び順
+              <select id="sortSelect">
+                <option value="updated">更新が新しい</option>
+                <option value="used">よく使う</option>
+                <option value="title">タイトル順</option>
+              </select>
+            </label>
+          </section>
+
+          <section class="control-group">
+            <h2>出力</h2>
+            <button class="ghost-button full" type="button" data-action="print-library">
+              <i data-lucide="printer"></i><span>定型文集を印刷</span>
+            </button>
+            <button class="ghost-button full danger-text" type="button" data-action="reset-samples">
+              <i data-lucide="rotate-ccw"></i><span>練習データに戻す</span>
+            </button>
+          </section>
+        </aside>
+
+        <section class="workspace">
+          <section class="metrics" aria-label="集計">
+            <article class="metric">
+              <span class="metric-label">登録数</span>
+              <strong id="totalCount">0</strong>
+              <small>定型文</small>
+            </article>
+            <article class="metric">
+              <span class="metric-label">お気に入り</span>
+              <strong id="favoriteCount">0</strong>
+              <small>すぐ使う文面</small>
+            </article>
+            <article class="metric">
+              <span class="metric-label">コピー回数</span>
+              <strong id="copyCount">0</strong>
+              <small>累計</small>
+            </article>
+            <article class="metric">
+              <span class="metric-label">用途</span>
+              <strong id="categoryCount">0</strong>
+              <small>カテゴリ</small>
+            </article>
+          </section>
+
+          <div class="work-grid">
+            <section class="board">
+              <div class="board-head">
+                <div>
+                  <p id="viewKicker">ストック</p>
+                  <h2 id="viewTitle">定型文一覧</h2>
+                </div>
+                <p id="resultSummary">0件</p>
+              </div>
+              <div id="templateList" class="template-list" aria-live="polite"></div>
+            </section>
+
+            <section class="detail-panel" aria-label="仕上げコピー">
+              <div class="board-head compact">
+                <div>
+                  <p>仕上げ</p>
+                  <h2 id="detailTitle">文面プレビュー</h2>
+                </div>
+                <button id="favoriteButton" class="icon-button" type="button" data-action="toggle-favorite" title="お気に入り" aria-label="お気に入り">
+                  <i data-lucide="star"></i>
+                </button>
+              </div>
+
+              <div id="detailEmpty" class="empty-detail">
+                <i data-lucide="message-circle"></i>
+                <p>定型文を選ぶと、ここで差し込みとコピーができます。</p>
+              </div>
+
+              <div id="detailContent" class="detail-content" hidden>
+                <div class="quick-fields">
+                  <label>
+                    相手名
+                    <input id="personInput" placeholder="例: 山田様" />
+                  </label>
+                  <label>
+                    会社名
+                    <input id="companyInput" placeholder="例: 株式会社サンプル" />
+                  </label>
+                  <label>
+                    案件・用件
+                    <input id="topicInput" placeholder="例: お見積りの件" />
+                  </label>
+                  <label>
+                    期限・日時
+                    <input id="deadlineInput" placeholder="例: 5月20日(水) 17時" />
+                  </label>
+                  <label class="span-2">
+                    差出人
+                    <input id="senderInput" placeholder="例: Green Partnership 佐藤" />
+                  </label>
+                </div>
+
+                <div class="preview-box">
+                  <pre id="previewText"></pre>
+                </div>
+
+                <div class="detail-actions">
+                  <button class="primary-button" type="button" data-action="copy-finished">
+                    <i data-lucide="copy"></i><span>コピー</span>
+                  </button>
+                  <button class="ghost-button" type="button" data-action="copy-claude">
+                    <i data-lucide="sparkles"></i><span>Claude用</span>
+                  </button>
+                  <button class="ghost-button" type="button" data-action="edit-template">
+                    <i data-lucide="pencil"></i><span>編集</span>
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="appSwitcherDialog" class="modal small">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <p>切替</p>
+            <h2>アプリ切替</h2>
+          </div>
+          <button class="icon-button" type="button" data-action="close-app-switcher" title="閉じる" aria-label="閉じる">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="app-switcher-body">
+          <button class="app-switcher-row is-current" type="button" data-action="switch-to-phrase-stock">
+            <span class="app-switcher-icon" aria-hidden="true"><i data-lucide="message-square-text"></i></span>
+            <span class="app-switcher-main">
+              <strong>定型文ストック</strong>
+              <small>社内共有DB</small>
+            </span>
+            <span class="app-switcher-status">表示中</span>
+          </button>
+          <div class="app-switcher-note">
+            他のアプリを同じWebサービスへ追加した場合、このウインドウから切り替え先を増やせます。
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="templateDialog" class="modal">
+      <form id="templateForm" method="dialog">
+        <div class="modal-head">
+          <div>
+            <p id="modalMode">新規</p>
+            <h2 id="modalTitle">定型文を追加</h2>
+          </div>
+          <button class="icon-button" type="button" data-action="close-dialog" title="閉じる" aria-label="閉じる">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <div class="form-grid">
+          <label class="span-2">
+            タイトル *
+            <input id="titleInput" name="title" required maxlength="80" placeholder="例: 日程調整のお礼と候補提示" />
+          </label>
+          <label>
+            用途
+            <select id="categoryInput" name="category"></select>
+          </label>
+          <label>
+            温度感
+            <select id="toneInput" name="tone"></select>
+          </label>
+          <label>
+            宛先
+            <select id="recipientInput" name="recipient"></select>
+          </label>
+          <label>
+            タグ
+            <input id="tagsInput" name="tags" maxlength="120" placeholder="例: 初回, 丁寧, メール" />
+          </label>
+          <label class="span-2">
+            本文 *
+            <textarea id="bodyInput" name="body" rows="10" required maxlength="2000"></textarea>
+          </label>
+          <div class="placeholder-row span-2" aria-label="差し込み語">
+            <button type="button" data-token="{相手名}">{相手名}</button>
+            <button type="button" data-token="{会社名}">{会社名}</button>
+            <button type="button" data-token="{案件名}">{案件名}</button>
+            <button type="button" data-token="{期限}">{期限}</button>
+            <button type="button" data-token="{差出人}">{差出人}</button>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="ghost-button danger-text" type="button" data-action="delete-template">
+            <i data-lucide="trash-2"></i><span>削除</span>
+          </button>
+          <div class="action-spacer"></div>
+          <button class="ghost-button" type="button" data-action="close-dialog">キャンセル</button>
+          <button class="primary-button" type="submit">
+            <i data-lucide="save"></i><span>保存</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="claudeDialog" class="modal small">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <p>Claude用</p>
+            <h2>改善依頼文</h2>
+          </div>
+          <button class="icon-button" type="button" data-action="close-claude" title="閉じる" aria-label="閉じる">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="claude-body">
+          <textarea id="claudePrompt" rows="12"></textarea>
+          <div class="detail-actions">
+            <button class="primary-button" type="button" data-action="copy-claude-prompt">
+              <i data-lucide="copy"></i><span>依頼文をコピー</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="writerDialog" class="modal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <p>文章作成</p>
+            <h2>要点から作る</h2>
+          </div>
+          <button class="icon-button" type="button" data-action="close-writer" title="閉じる" aria-label="閉じる">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="writer-body">
+          <div class="form-grid no-border">
+            <label>
+              用途
+              <select id="writerCategory"></select>
+            </label>
+            <label>
+              温度感
+              <select id="writerTone"></select>
+            </label>
+            <label>
+              宛先
+              <select id="writerRecipient"></select>
+            </label>
+            <label>
+              相手名
+              <input id="writerPerson" placeholder="例: 山田様" />
+            </label>
+            <label class="span-2">
+              伝えたいこと *
+              <textarea id="writerPoint" rows="4" placeholder="例: 来週の打ち合わせ候補日を3つ提示し、都合のよい日時を選んでもらいたい"></textarea>
+            </label>
+            <label>
+              期限・日時
+              <input id="writerDeadline" placeholder="例: 5月20日(水) 17時" />
+            </label>
+            <label>
+              差出人
+              <input id="writerSender" placeholder="例: 佐藤" />
+            </label>
+            <label class="span-2">
+              補足・配慮
+              <input id="writerCare" placeholder="例: 急がせすぎず、確認の負担を軽くしたい" />
+            </label>
+          </div>
+          <div class="preview-box writer-preview">
+            <pre id="writerOutput"></pre>
+          </div>
+          <div class="detail-actions">
+            <button class="primary-button" type="button" data-action="generate-writer">
+              <i data-lucide="wand-sparkles"></i><span>作る</span>
+            </button>
+            <button class="ghost-button" type="button" data-action="copy-writer">
+              <i data-lucide="copy"></i><span>コピー</span>
+            </button>
+            <button class="ghost-button" type="button" data-action="save-writer-template">
+              <i data-lucide="bookmark-plus"></i><span>保存</span>
+            </button>
+            <button class="ghost-button" type="button" data-action="writer-to-claude">
+              <i data-lucide="sparkles"></i><span>Claude用</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="helpDialog" class="modal wide">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <p>ヘルプ</p>
+            <h2>操作方法とボタン解説</h2>
+          </div>
+          <button class="icon-button" type="button" data-action="close-help" title="閉じる" aria-label="閉じる">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div id="helpContent" class="help-content"></div>
+      </div>
+    </dialog>
+
+    <dialog id="loginDialog" class="modal login-modal">
+      <form id="loginForm" method="dialog">
+        <div class="modal-head">
+          <div>
+            <p>クラウド共有ログイン</p>
+            <h2>共有定型文にログイン</h2>
+          </div>
+        </div>
+        <div class="form-grid no-border">
+          <label class="span-2">
+            パスワード
+            <input id="loginPassword" type="password" autocomplete="current-password" required />
+          </label>
+          <p id="loginMessage" class="login-message span-2"></p>
+        </div>
+        <div class="modal-actions">
+          <button class="primary-button" type="submit">
+            <i data-lucide="log-in"></i><span>ログイン</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="quickHelp" class="quick-help" role="tooltip"></div>
+  </body>
+</html>

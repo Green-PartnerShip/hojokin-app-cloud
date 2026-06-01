@@ -563,6 +563,14 @@
         </div>
       </div>
       <div class="app-tile">
+        <h3>定型文ストック</h3>
+        <p>社内共有の定型文を検索・追加・編集し、自然な日本語文をすぐ使える形にします。</p>
+        <div class="tile-actions">
+          <button class="primary" onclick="goToPhraseStock(false)">定型文ストックを開く</button>
+          <button onclick="goToPhraseStock(true)">別ウィンドウで開く</button>
+        </div>
+      </div>
+      <div class="app-tile">
         <h3>アプリ切替用URL</h3>
         <p>他の画面から切り替えるボタンを作る場合は、同じサービス内の /app-switch にリンクしてください。</p>
         <div class="tile-actions">
@@ -2293,11 +2301,21 @@ function generateReport(){
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('show'); }));
 const GP_APP_ROUTE = '/internal/gp';
+const PHRASE_STOCK_ROUTE = '/phrase-stock/';
 function openAppSwitch(){ document.getElementById('appSwitchModal').classList.add('show'); }
 function goToGpApp(newWindow=false){
   const url = location.origin + GP_APP_ROUTE;
   if(newWindow){
     const w = window.open(url, 'gpBusinessManagement', 'width=1280,height=860,noopener');
+    if(!w) location.href = url;
+    return;
+  }
+  location.href = url;
+}
+function goToPhraseStock(newWindow=false){
+  const url = location.origin + PHRASE_STOCK_ROUTE;
+  if(newWindow){
+    const w = window.open(url, 'phraseStock', 'width=1280,height=860,noopener');
     if(!w) location.href = url;
     return;
   }

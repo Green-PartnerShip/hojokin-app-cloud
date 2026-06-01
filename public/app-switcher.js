@@ -19,6 +19,12 @@
       description: "国・都道府県・市区町村の補助金を検索します。"
     },
     {
+      title: "定型文ストック",
+      short: "Stock",
+      path: "/phrase-stock/",
+      description: "社内共有の定型文を検索・追加・編集します。"
+    },
+    {
       title: "ヒアリング整理（会社）",
       short: "Hear",
       path: "/internal/hearing/company",
