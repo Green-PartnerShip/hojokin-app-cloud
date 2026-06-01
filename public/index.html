@@ -76,6 +76,46 @@
   .due-soon { background:var(--red-bg); color:var(--red); padding:1px 6px; border-radius:4px; }
   .footer { font-size:11px; color:var(--gray-600); margin-top:24px; padding-top:16px; border-top:1px solid var(--gray-200); }
   .footer a { color:var(--primary); }
+
+  @media (max-width: 760px) {
+    body { min-width:0; }
+    header { padding:12px; align-items:flex-start; }
+    header h1 { font-size:17px; line-height:1.35; }
+    header .sub { width:100%; line-height:1.5; }
+    header .actions { width:100%; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-top:8px !important; }
+    header .actions .btn-secondary { width:100%; min-height:42px; padding:10px 8px; text-align:center; font-size:12px; line-height:1.35; }
+    main { padding:12px; }
+    .filters { padding:12px; border-radius:8px; margin-bottom:12px; }
+    .filter-row { grid-template-columns:1fr; gap:10px; margin-bottom:10px; }
+    label { font-size:12px; }
+    select, input[type=text], input[type=number], textarea { font-size:16px; min-height:44px; padding:10px 11px; }
+    button { min-height:44px; }
+    .filters .actions, .web-panel .actions { display:grid; grid-template-columns:1fr; gap:8px; }
+    .filters .actions button, .web-panel .actions button { width:100%; padding:12px 10px; font-size:14px; }
+    .tabs { overflow-x:auto; overflow-y:hidden; white-space:nowrap; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+    .tabs::-webkit-scrollbar { height:0; }
+    .tab { flex:0 0 auto; min-height:44px; padding:12px 14px; }
+    .empty { padding:24px 12px; }
+    .web-panel, .shared-panel { padding:12px; }
+    .prompt-box, .answer-box { min-height:220px; font-size:14px; }
+    .shared-toolbar { align-items:stretch; }
+    .shared-toolbar button { width:100%; }
+    .saved-card { padding:10px; }
+    .saved-card .actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .saved-card .actions a, .saved-card .actions button { width:100%; }
+    #history-list { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .shared-table { min-width:640px; }
+    .gridjs-search { float:none; width:100%; margin-bottom:8px; }
+    .gridjs-search-input { width:100% !important; font-size:16px !important; min-height:44px; }
+    .gridjs-footer { overflow-x:auto; }
+    .gridjs-pagination { display:flex; flex-wrap:wrap; gap:4px; }
+    .grid-floating-scroll { left:12px !important; right:12px !important; bottom:8px; height:28px; }
+  }
+
+  @media (max-width: 420px) {
+    header .actions { grid-template-columns:1fr; }
+    .saved-card .actions { grid-template-columns:1fr; }
+  }
 </style>
 </head>
 <body>
