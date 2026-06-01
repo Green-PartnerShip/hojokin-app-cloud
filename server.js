@@ -57,13 +57,19 @@ const dbStatus = { enabled: !!dbPool, ready: false, error: "" };
 let dbInitPromise = null;
 const pgPool = dbPool;
 const hearingEventClients = new Set();
-const hearingDataDir = path.resolve(process.env.HEARING_DATA_DIR || path.join(__dirname, "data"));
+const APP_DATA_DIR = path.resolve(process.env.APP_DATA_DIR || process.env.DATA_DIR || path.join(__dirname, ".data"));
+const hearingDataDir = path.resolve(process.env.HEARING_DATA_DIR || path.join(APP_DATA_DIR, "hearing"));
 const hearingCasesFile = path.join(hearingDataDir, "hearing-cases.json");
 let hearingStoreReady = null;
 let hearingFileQueue = Promise.resolve();
-const TASKS_FILE = path.join(__dirname, ".data", "shared-tasks.json");
+const TASKS_FILE = path.join(APP_DATA_DIR, "shared-tasks.json");
+const EXPLANATION_DRAFTS_FILE = path.join(APP_DATA_DIR, "explanation-drafts.json");
+const SHARED_HISTORY_FILE = path.join(APP_DATA_DIR, "shared-search-history.json");
+const SAVED_SUBSIDIES_FILE = path.join(APP_DATA_DIR, "saved-subsidies.json");
 let taskStoreReady = null;
 let taskFileQueue = Promise.resolve();
+let explanationDraftFileQueue = Promise.resolve();
+let sharedDataFileQueue = Promise.resolve();
 
 if (PUBLIC_ACCESS) {
   app.set("trust proxy", 1);
@@ -262,6 +268,24 @@ const priorityValues = new Set(["critical", "high", "normal", "low"]);
 
 const cleanTaskText = (value, maxLength) => String(value || "").trim().slice(0, maxLength);
 
+const readJsonFile = async (filePath, fallback) => {
+  try {
+    const content = await fs.promises.readFile(filePath, "utf8");
+    return JSON.parse(content);
+  } catch (error) {
+    if (error.code === "ENOENT") return fallback;
+    throw error;
+  }
+};
+
+const writeJsonFile = async (filePath, value) => {
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+  const temporaryFile = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  await fs.promises.writeFile(temporaryFile, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await fs.promises.rename(temporaryFile, filePath);
+  return value;
+};
+
 const normalizeTask = (task = {}) => {
   const now = Date.now();
   return {
@@ -303,6 +327,34 @@ const ensureExplanationDraftStore = async () => {
     )
   `);
   return true;
+};
+
+const readExplanationDraftFile = async () => {
+  const parsed = await readJsonFile(EXPLANATION_DRAFTS_FILE, { drafts: [] });
+  const drafts = Array.isArray(parsed.drafts) ? parsed.drafts.map(normalizeExplanationDraft) : [];
+  return drafts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 50);
+};
+
+const writeExplanationDraftFile = async (drafts) => {
+  const store = {
+    drafts: drafts
+      .map(normalizeExplanationDraft)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 50),
+    updatedAt: new Date().toISOString()
+  };
+  await writeJsonFile(EXPLANATION_DRAFTS_FILE, store);
+  return store.drafts;
+};
+
+const mutateExplanationDraftFile = async (work) => {
+  const run = explanationDraftFileQueue.then(async () => {
+    const drafts = await readExplanationDraftFile();
+    const nextDrafts = await work(drafts);
+    return writeExplanationDraftFile(nextDrafts || drafts);
+  });
+  explanationDraftFileQueue = run.catch(() => {});
+  return run;
 };
 
 const ensureTaskStore = async () => {
@@ -1051,7 +1103,8 @@ app.get("/explanation/api/health", (req, res) => {
     mode: PUBLIC_ACCESS ? "cloud" : "local",
     authRequired: AUTH_REQUIRED,
     authenticated: Boolean(getValidSession(req)),
-    sharedDrafts: Boolean(pgPool)
+    sharedDrafts: true,
+    storage: pgPool ? "postgres" : "file"
   });
 });
 
@@ -1066,7 +1119,10 @@ app.post("/explanation/api/transform", (req, res) => {
 
 app.get("/explanation/api/drafts", async (_req, res) => {
   try {
-    if (!pgPool) return res.json({ ok: true, shared: false, drafts: [] });
+    if (!pgPool) {
+      const drafts = await readExplanationDraftFile();
+      return res.json({ ok: true, shared: true, storage: "file", drafts });
+    }
     await ensureExplanationDraftStore();
     const result = await pgPool.query(
       "SELECT id, payload, created_at FROM explanation_drafts ORDER BY created_at DESC LIMIT 50"
@@ -1085,9 +1141,12 @@ app.get("/explanation/api/drafts", async (_req, res) => {
 
 app.post("/explanation/api/drafts", async (req, res) => {
   try {
-    if (!pgPool) return res.status(503).json({ ok: false, message: "database_not_configured" });
-    await ensureExplanationDraftStore();
     const draft = normalizeExplanationDraft(req.body || {});
+    if (!pgPool) {
+      await mutateExplanationDraftFile((drafts) => [draft, ...drafts.filter((item) => item.id !== draft.id)]);
+      return res.status(201).json({ ok: true, shared: true, storage: "file", draft });
+    }
+    await ensureExplanationDraftStore();
     await pgPool.query(
       `INSERT INTO explanation_drafts (id, payload, created_at, updated_at)
        VALUES ($1, $2::jsonb, $3, now())
@@ -1103,9 +1162,12 @@ app.post("/explanation/api/drafts", async (req, res) => {
 
 app.delete("/explanation/api/drafts/:id", async (req, res) => {
   try {
-    if (!pgPool) return res.status(503).json({ ok: false, message: "database_not_configured" });
-    await ensureExplanationDraftStore();
     const id = cleanTaskText(req.params.id, 120);
+    if (!pgPool) {
+      await mutateExplanationDraftFile((drafts) => drafts.filter((draft) => draft.id !== id));
+      return res.json({ ok: true, shared: true, storage: "file" });
+    }
+    await ensureExplanationDraftStore();
     await pgPool.query("DELETE FROM explanation_drafts WHERE id = $1", [id]);
     res.json({ ok: true, shared: true });
   } catch (error) {
@@ -1215,8 +1277,108 @@ const sharedDbUnavailable = () => ({
 
 const dbText = (value, maxLength = 500) => cleanInput(value, "", maxLength);
 
+const normalizeHistoryRow = (row = {}) => ({
+  id: Number.isSafeInteger(Number(row.id)) ? Number(row.id) : Date.now(),
+  created_at: row.created_at || row.createdAt || new Date().toISOString(),
+  keyword: dbText(row.keyword, 120),
+  prefecture: dbText(row.prefecture, 40),
+  municipality: dbText(row.municipality, 120),
+  theme: dbText(row.theme, 120),
+  industry: dbText(row.industry, 120),
+  employees: dbText(row.employees, 40),
+  entity: dbText(row.entity, 80),
+  result_count: Math.max(0, Number(row.result_count ?? row.resultCount) || 0),
+  source: dbText(row.source || "jgrants", 40)
+});
+
+const normalizeSavedSubsidyRow = (item = {}, id = null) => ({
+  id: Number.isSafeInteger(Number(id ?? item.id)) ? Number(id ?? item.id) : Date.now(),
+  created_at: item.created_at || item.createdAt || new Date().toISOString(),
+  updated_at: item.updated_at || item.updatedAt || new Date().toISOString(),
+  subsidy_id: dbText(item.subsidy_id || item.id, 120),
+  title: dbText(item.title || item.subsidy_name || item.name, 500),
+  issuer: dbText(item.issuer, 300),
+  target_area: dbText(item.target_area, 300),
+  acceptance_start: dbText(item.acceptance_start, 80),
+  acceptance_end: dbText(item.acceptance_end, 80),
+  subsidy_min_limit: dbText(item.subsidy_min_limit, 80),
+  subsidy_max_limit: dbText(item.subsidy_max_limit, 80),
+  subsidy_rate: dbText(item.subsidy_rate, 300),
+  use_purpose: dbText(item.use_purpose, 2500),
+  detail_url: dbText(item.detail_url || item.front_subsidy_detail_page_url, 1000),
+  source_url: dbText(item.source_url || item.official_source_url, 1000),
+  note: dbText(item.note, 1000)
+});
+
+const readSharedFileStore = async () => {
+  const [historyStore, savedStore] = await Promise.all([
+    readJsonFile(SHARED_HISTORY_FILE, { history: [], lastId: 0 }),
+    readJsonFile(SAVED_SUBSIDIES_FILE, { items: [], lastId: 0 })
+  ]);
+  return {
+    history: Array.isArray(historyStore.history) ? historyStore.history.map(normalizeHistoryRow) : [],
+    historyLastId: Number(historyStore.lastId) || 0,
+    items: Array.isArray(savedStore.items) ? savedStore.items.map((item) => normalizeSavedSubsidyRow(item, item.id)) : [],
+    savedLastId: Number(savedStore.lastId) || 0
+  };
+};
+
+const writeSharedFileStore = async (store) => {
+  await Promise.all([
+    writeJsonFile(SHARED_HISTORY_FILE, {
+      lastId: store.historyLastId || 0,
+      history: (store.history || [])
+        .map(normalizeHistoryRow)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 200)
+    }),
+    writeJsonFile(SAVED_SUBSIDIES_FILE, {
+      lastId: store.savedLastId || 0,
+      items: (store.items || [])
+        .map((item) => normalizeSavedSubsidyRow(item, item.id))
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+        .slice(0, 500)
+    })
+  ]);
+  return store;
+};
+
+const mutateSharedFileStore = async (work) => {
+  const run = sharedDataFileQueue.then(async () => {
+    const store = await readSharedFileStore();
+    const nextStore = await work(store);
+    return writeSharedFileStore(nextStore || store);
+  });
+  sharedDataFileQueue = run.catch(() => {});
+  return run;
+};
+
 const recordSearchHistory = async (query, resultCount) => {
-  if (!dbPool) return;
+  if (!dbPool) {
+    try {
+      await mutateSharedFileStore((store) => {
+        const nextId = Math.max(store.historyLastId || 0, ...store.history.map((row) => Number(row.id) || 0)) + 1;
+        store.historyLastId = nextId;
+        store.history.unshift(normalizeHistoryRow({
+          id: nextId,
+          keyword: query.keyword,
+          prefecture: query.prefecture,
+          municipality: query.municipality,
+          theme: query.theme,
+          industry: query.industry,
+          employees: query.employees,
+          entity: query.entity,
+          result_count: resultCount,
+          source: "jgrants"
+        }));
+        store.history = store.history.slice(0, 200);
+        return store;
+      });
+    } catch (e) {
+      console.warn("[file-store] search history skipped:", e.message);
+    }
+    return;
+  }
   try {
     const pool = await ensureDbReady();
     await pool.query(`
@@ -1661,7 +1823,7 @@ app.post("/api/ask-ai", (_req, res) => {
 });
 
 app.get("/api/shared/status", async (_req, res) => {
-  if (!dbPool) return res.json({ ok: true, enabled: false, ready: false });
+  if (!dbPool) return res.json({ ok: true, enabled: true, ready: true, storage: "file" });
   try {
     await ensureDbReady();
   } catch {
@@ -1671,12 +1833,24 @@ app.get("/api/shared/status", async (_req, res) => {
     ok: true,
     enabled: true,
     ready: dbStatus.ready,
+    storage: "postgres",
     error: dbStatus.ready ? "" : dbStatus.error
   });
 });
 
 app.get("/api/shared/history", async (req, res) => {
-  if (!dbPool) return res.json(sharedDbUnavailable());
+  if (!dbPool) {
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const store = await readSharedFileStore();
+    return res.json({
+      ok: true,
+      enabled: true,
+      storage: "file",
+      history: store.history
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, limit)
+    });
+  }
   try {
     const pool = await ensureDbReady();
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
@@ -1693,7 +1867,18 @@ app.get("/api/shared/history", async (req, res) => {
 });
 
 app.get("/api/shared/saved", async (req, res) => {
-  if (!dbPool) return res.json(sharedDbUnavailable());
+  if (!dbPool) {
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
+    const store = await readSharedFileStore();
+    return res.json({
+      ok: true,
+      enabled: true,
+      storage: "file",
+      items: store.items
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+        .slice(0, limit)
+    });
+  }
   try {
     const pool = await ensureDbReady();
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
@@ -1712,12 +1897,32 @@ app.get("/api/shared/saved", async (req, res) => {
 });
 
 app.post("/api/shared/saved", async (req, res) => {
-  if (!dbPool) return res.status(503).json({ ok: false, enabled: false, error: "Shared database is not connected." });
   try {
     const item = req.body?.item || req.body || {};
     const subsidyId = dbText(item.id || item.subsidy_id, 120);
     const title = dbText(item.subsidy_name || item.title || item.name, 500);
     if (!subsidyId || !title) return res.status(400).json({ ok: false, error: "Invalid subsidy item." });
+
+    if (!dbPool) {
+      let savedItem = null;
+      await mutateSharedFileStore((store) => {
+        const now = new Date().toISOString();
+        const existing = store.items.find((candidate) => candidate.subsidy_id === subsidyId);
+        const nextId = existing?.id || Math.max(store.savedLastId || 0, ...store.items.map((row) => Number(row.id) || 0)) + 1;
+        store.savedLastId = Math.max(store.savedLastId || 0, nextId);
+        savedItem = normalizeSavedSubsidyRow({
+          ...item,
+          id: nextId,
+          subsidy_id: subsidyId,
+          title,
+          created_at: existing?.created_at || now,
+          updated_at: now
+        }, nextId);
+        store.items = [savedItem, ...store.items.filter((candidate) => candidate.subsidy_id !== subsidyId)];
+        return store;
+      });
+      return res.json({ ok: true, enabled: true, storage: "file", item: savedItem });
+    }
 
     const pool = await ensureDbReady();
     const { rows } = await pool.query(`
@@ -1764,9 +1969,18 @@ app.post("/api/shared/saved", async (req, res) => {
 });
 
 app.delete("/api/shared/saved/:id", async (req, res) => {
-  if (!dbPool) return res.status(503).json({ ok: false, enabled: false, error: "Shared database is not connected." });
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ ok: false, error: "Invalid saved item id." });
+  if (!dbPool) {
+    let deleted = 0;
+    await mutateSharedFileStore((store) => {
+      const before = store.items.length;
+      store.items = store.items.filter((item) => Number(item.id) !== id);
+      deleted = before - store.items.length;
+      return store;
+    });
+    return res.json({ ok: true, storage: "file", deleted });
+  }
   try {
     const pool = await ensureDbReady();
     const { rowCount } = await pool.query("DELETE FROM saved_subsidies WHERE id = $1", [id]);
@@ -1785,6 +1999,11 @@ app.get("/api/health", (_req, res) => {
     shared_db: {
       enabled: dbStatus.enabled,
       ready: dbStatus.ready
+    },
+    shared_storage: {
+      enabled: true,
+      type: dbPool ? "postgres" : "file",
+      data_dir: APP_DATA_DIR
     },
     lan_urls: getLanUrls(ACTIVE_PORT)
   });
