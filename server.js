@@ -68,10 +68,13 @@ const TASKS_FILE = path.join(APP_DATA_DIR, "shared-tasks.json");
 const EXPLANATION_DRAFTS_FILE = path.join(APP_DATA_DIR, "explanation-drafts.json");
 const SHARED_HISTORY_FILE = path.join(APP_DATA_DIR, "shared-search-history.json");
 const SAVED_SUBSIDIES_FILE = path.join(APP_DATA_DIR, "saved-subsidies.json");
+const GP_STORE_FILE = path.join(APP_DATA_DIR, "gp-shared-store.json");
+const GP_BACKUPS_FILE = path.join(APP_DATA_DIR, "gp-shared-backups.json");
 let taskStoreReady = null;
 let taskFileQueue = Promise.resolve();
 let explanationDraftFileQueue = Promise.resolve();
 let sharedDataFileQueue = Promise.resolve();
+let gpFileQueue = Promise.resolve();
 
 if (PUBLIC_ACCESS) {
   app.set("trust proxy", 1);
@@ -1379,6 +1382,17 @@ const normalizeGpStore = (data) => {
 };
 
 const readGpEnvelope = async () => {
+  if (!dbPool) {
+    const parsed = await readJsonFile(GP_STORE_FILE, null);
+    if (!parsed) {
+      return { revision: 0, updatedAt: null, data: defaultGpStore() };
+    }
+    return {
+      revision: Number(parsed.revision) || 0,
+      updatedAt: parsed.updatedAt || null,
+      data: normalizeGpStore(parsed.data || defaultGpStore())
+    };
+  }
   const pool = await ensureDbReady();
   const { rows } = await pool.query("SELECT revision, updated_at, data FROM gp_shared_store WHERE id = $1", ["main"]);
   if (!rows.length) {
@@ -1397,6 +1411,21 @@ const readGpEnvelope = async () => {
 };
 
 const backupGpEnvelope = async (envelope) => {
+  if (!dbPool) {
+    try {
+      const parsed = await readJsonFile(GP_BACKUPS_FILE, { backups: [] });
+      const backups = Array.isArray(parsed.backups) ? parsed.backups : [];
+      backups.unshift({
+        revision: Number(envelope.revision) || 0,
+        createdAt: new Date().toISOString(),
+        data: normalizeGpStore(envelope.data || defaultGpStore())
+      });
+      await writeJsonFile(GP_BACKUPS_FILE, { backups: backups.slice(0, 30) });
+    } catch (e) {
+      console.warn("[file-store] GP backup skipped:", e.message);
+    }
+    return;
+  }
   try {
     const pool = await ensureDbReady();
     await pool.query(
@@ -1978,22 +2007,20 @@ app.get("/api/shared/status", async (_req, res) => {
 });
 
 app.get("/api/store", async (_req, res) => {
-  if (!dbPool) return res.status(503).json({ ok: false, error: "Shared database is not connected." });
   try {
     const envelope = await readGpEnvelope();
-    res.json({ ok: true, ...envelope });
+    res.json({ ok: true, storage: dbPool ? "postgres" : "file", ...envelope });
   } catch (e) {
     res.status(503).json({ ok: false, error: e.message });
   }
 });
 
 app.put("/api/store", async (req, res) => {
-  if (!dbPool) return res.status(503).json({ ok: false, error: "Shared database is not connected." });
   try {
     const payload = req.body || {};
     const expected = Number(payload.revision || 0);
     const force = payload.force === true;
-    const current = await readGpEnvelope();
+    const current = dbPool ? await readGpEnvelope() : await gpFileQueue.then(() => readGpEnvelope());
     if (!force && expected !== current.revision) {
       return res.status(409).json({ ok: false, error: "revision conflict", ...current });
     }
@@ -2002,6 +2029,28 @@ app.put("/api/store", async (req, res) => {
       updatedAt: new Date().toISOString(),
       data: normalizeGpStore(payload.data)
     };
+    if (!dbPool) {
+      const run = gpFileQueue.then(async () => {
+        const latest = await readGpEnvelope();
+        if (!force && expected !== latest.revision) {
+          return { conflict: true, latest };
+        }
+        const fileNext = {
+          revision: latest.revision + 1,
+          updatedAt: new Date().toISOString(),
+          data: normalizeGpStore(payload.data)
+        };
+        await backupGpEnvelope(latest);
+        await writeJsonFile(GP_STORE_FILE, fileNext);
+        return { next: fileNext };
+      });
+      gpFileQueue = run.catch(() => {});
+      const fileResult = await run;
+      if (fileResult.conflict) {
+        return res.status(409).json({ ok: false, error: "revision conflict", ...fileResult.latest });
+      }
+      return res.json({ ok: true, storage: "file", ...fileResult.next });
+    }
     await backupGpEnvelope(current);
     const pool = await ensureDbReady();
     const { rowCount } = await pool.query(

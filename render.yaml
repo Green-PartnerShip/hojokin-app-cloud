@@ -4,6 +4,10 @@ services:
     env: docker
     plan: starter
     autoDeploy: true
+    disk:
+      name: app-data
+      mountPath: /app/storage
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -19,5 +23,5 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
-      - key: DATABASE_URL
-        sync: false
+      - key: APP_DATA_DIR
+        value: /app/storage
