@@ -737,8 +737,8 @@ const renderInternalHub = () => `<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>統合メニュー - 補助金クラウド</title>
-  <link rel="stylesheet" href="/app-switcher.css?v=20260601b">
-  <script defer src="/app-switcher.js?v=20260601b"></script>
+  <link rel="stylesheet" href="/app-switcher.css?v=20260602g">
+  <script defer src="/app-switcher.js?v=20260602g"></script>
   <style>
     body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f6f8f7;color:#18221f}
     .wrap{max-width:1040px;margin:0 auto;padding:28px}
