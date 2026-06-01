@@ -1,0 +1,2538 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+<meta name="referrer" content="no-referrer">
+<title>GP業務管理 | Green Partnership</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif; margin: 0; background: #f7f8f6; color: #1f2a1f; font-size: 13px; }
+
+  header { background: #fff; color: #1f2a1f; padding: 14px 22px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-top: 5px solid #2d5a3d; border-bottom: 1px solid #dfe6df; box-shadow: 0 2px 10px rgba(31,42,31,.05); }
+  header h1 { margin: 0; font-size: 18px; letter-spacing: .04em; color: #244c34; }
+  header .sub { font-size: 11px; color: #667566; }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .help-button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #2d5a3d; background: #2d5a3d; color: #fff; font-size: 18px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(45,90,61,.18); }
+  .help-button:hover { background: #234a30; }
+  .app-switch-button { min-height: 34px; border-radius: 6px; border: 1px solid #2d5a3d; background: #fff; color: #2d5a3d; font-size: 12px; font-weight: 700; cursor: pointer; padding: 0 12px; box-shadow: 0 4px 10px rgba(45,90,61,.08); }
+  .app-switch-button:hover { background: #f2f7f2; }
+
+  nav.tabs { background: #fff; padding: 0 20px; border-bottom: 1px solid #e3e6e3; display: flex; gap: 4px; position: sticky; top: 0; z-index: 50; flex-wrap: wrap; box-shadow: 0 4px 16px rgba(31,42,31,.04); }
+  nav.tabs button { background: transparent; border: none; padding: 12px 14px; cursor: pointer; font-size: 12px; color: #5f705f; border-bottom: 3px solid transparent; font-weight: 500; }
+  nav.tabs button.active { color: #2d5a3d; border-color: #2d5a3d; font-weight: 700; }
+  nav.tabs button:hover { background: #f5f8f5; }
+  nav.tabs .spacer { flex: 1; }
+  nav.tabs .global-actions { display: flex; align-items: center; gap: 6px; padding: 6px 0; }
+  nav.tabs .global-actions button { padding: 5px 10px; font-size: 11px; border: 1px solid #cfd6cf; border-radius: 4px; }
+
+  .tab-content { display: none; padding: 18px 22px 36px; max-width: 1480px; margin: 0 auto; }
+  .tab-content.active { display: block; }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .toolbar button, .toolbar select, .toolbar input { font-size: 12px; padding: 6px 10px; border-radius: 5px; border: 1px solid #cfd6cf; background: #fff; cursor: pointer; }
+  .toolbar button.primary { background: #2d5a3d; color: #fff; border-color: #2d5a3d; }
+  .toolbar button.primary:hover { background: #234a30; }
+  .toolbar button:hover { background: #f0f4f0; }
+  .toolbar .spacer { flex: 1; }
+
+  /* Hero metric */
+  .hero { background: linear-gradient(135deg, #2d5a3d 0%, #4a8b5e 100%); color: #fff; border-radius: 8px; padding: 20px 24px; margin-bottom: 16px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; align-items: center; box-shadow: 0 10px 26px rgba(45,90,61,.14); }
+  .hero .main .label { font-size: 12px; opacity: .85; letter-spacing: .1em; }
+  .hero .main .value { font-size: 38px; font-weight: 800; letter-spacing: -.01em; margin: 4px 0; }
+  .hero .main .sub { font-size: 11px; opacity: .85; }
+  .hero .breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hero .breakdown .item { background: rgba(255,255,255,.13); padding: 10px 12px; border-radius: 6px; }
+  .hero .breakdown .item .l { font-size: 10px; opacity: .85; }
+  .hero .breakdown .item .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat { background: #fff; padding: 12px 14px; border-radius: 8px; border: 1px solid #e3e6e3; box-shadow: 0 4px 14px rgba(31,42,31,.035); }
+  .stat .label { font-size: 11px; color: #6b7a6b; }
+  .stat .value { font-size: 19px; font-weight: 700; color: #2d5a3d; margin-top: 2px; }
+  .stat .sub { font-size: 10px; color: #6b7a6b; margin-top: 2px; }
+  .stat.alert .value { color: #a83232; }
+  .stat.warn .value { color: #8b6d1f; }
+
+  .card-section { background: #fff; border-radius: 8px; padding: 14px 16px; border: 1px solid #e3e6e3; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(31,42,31,.035); }
+  .card-section h3 { margin: 0 0 10px; font-size: 13px; color: #2d5a3d; display: flex; justify-content: space-between; align-items: center; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; background: #fff; border-radius: 8px; overflow: hidden; }
+  th, td { padding: 7px 9px; text-align: left; border-bottom: 1px solid #eef2ee; vertical-align: top; }
+  th { background: #2d5a3d; color: #fff; font-weight: 600; font-size: 11px; }
+  tr:hover td { background: #f5f8f5; }
+  tr.click-row { cursor: pointer; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .empty { text-align: center; padding: 30px; color: #6b7a6b; font-size: 12px; }
+  .inline-actions { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+  .inline-actions button { font-size: 11px; padding: 3px 8px; }
+
+  .pager { display: flex; gap: 4px; justify-content: center; align-items: center; padding: 12px 0; flex-wrap: wrap; }
+  .pager button { padding: 4px 10px; font-size: 11px; border: 1px solid #cfd6cf; background: #fff; border-radius: 4px; cursor: pointer; }
+  .pager button.active { background: #2d5a3d; color: #fff; border-color: #2d5a3d; }
+  .pager button:disabled { opacity: .4; cursor: not-allowed; }
+  .pager .info { color: #6b7a6b; font-size: 11px; margin: 0 8px; }
+
+  .phase-pre { background: #c7d9e0; color: #1f3a4a; }
+  .phase-prep { background: #e8dcb2; color: #5a4a1f; }
+  .phase-rev { background: #c8c0d6; color: #3a2f55; }
+  .phase-post { background: #b2d4cc; color: #1f4a3a; }
+  .phase-done { background: #a8c8a8; color: #1f4a1f; }
+
+  #kanban { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
+  .col { flex: 0 0 240px; border-radius: 8px; padding: 8px; max-height: calc(100vh - 280px); display: flex; flex-direction: column; }
+  .col h4 { margin: 0 0 8px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; border-radius: 4px; }
+  .col h4 .count { background: rgba(0,0,0,.15); font-size: 10px; padding: 1px 6px; border-radius: 10px; }
+  .col .cards { overflow-y: auto; flex: 1; min-height: 30px; }
+  .col.dropping { outline: 2px dashed #2d5a3d; outline-offset: -2px; }
+  .case-card { background: #fff; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; border: 1px solid #e3e6e3; cursor: grab; font-size: 11px; }
+  .case-card:active { cursor: grabbing; }
+  .case-card.dragging { opacity: .4; }
+  .case-card .title { font-weight: 700; color: #1f2a1f; margin-bottom: 2px; font-size: 12px; }
+  .case-card .meta { color: #6b7a6b; line-height: 1.5; }
+
+  .plan-tag { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; margin-right: 3px; font-weight: 600; }
+  .plan-ミニ { background: #e0e6e0; color: #4a5a4a; }
+  .plan-スタンダード { background: #c9e2d2; color: #1f4a30; }
+  .plan-プレミアム { background: #f5e6c8; color: #6b4a1f; }
+  .plan-スポット { background: #d6d0e2; color: #3a2f55; }
+  .plan-未契約 { background: #ddd; color: #555; }
+  .due-tag { font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-top: 3px; display: inline-block; }
+  .due-ok { background: #e8f0e8; color: #2d5a3d; }
+  .due-soon { background: #fff4d6; color: #8b6d1f; }
+  .due-over { background: #fbe1e1; color: #a83232; }
+
+  /* Modal */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+  .modal-bg.show { display: flex; }
+  .modal { background: #fff; border-radius: 10px; padding: 18px 20px; width: 760px; max-width: 100%; max-height: 92vh; overflow-y: auto; }
+  .modal h2 { margin: 0 0 12px; font-size: 15px; color: #2d5a3d; padding-bottom: 8px; border-bottom: 2px solid #2d5a3d; }
+  .modal h4 { margin: 14px 0 6px; font-size: 11px; color: #2d5a3d; text-transform: uppercase; letter-spacing: .05em; border-left: 3px solid #4a8b5e; padding-left: 6px; }
+  .modal label { display: block; font-size: 10px; color: #6b7a6b; margin-top: 8px; margin-bottom: 2px; }
+  .modal input, .modal select, .modal textarea { width: 100%; padding: 5px 7px; border: 1px solid #cfd6cf; border-radius: 4px; font-size: 12px; font-family: inherit; background: #fff; }
+  .modal textarea { resize: vertical; min-height: 50px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+  .docs-cat { background: #f9faf9; border: 1px solid #e3e6e3; border-radius: 6px; padding: 8px 10px; margin-top: 6px; }
+  .docs-cat .cat-title { font-size: 10px; color: #2d5a3d; font-weight: 700; margin-bottom: 4px; }
+  .docs-list label { display: flex; align-items: flex-start; gap: 5px; margin: 2px 0; font-size: 11px; color: #1f2a1f; cursor: pointer; line-height: 1.4; }
+  .docs-list input[type=checkbox] { width: auto; margin-top: 3px; flex-shrink: 0; }
+  .modal .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid #eef2ee; }
+  .modal button { padding: 7px 14px; border-radius: 5px; border: 1px solid #cfd6cf; background: #fff; cursor: pointer; font-size: 12px; }
+  .modal button.primary { background: #2d5a3d; color: #fff; border-color: #2d5a3d; }
+  .modal button.danger { background: #c14545; color: #fff; border-color: #c14545; }
+  .readonly-val { padding: 5px 7px; background: #f5f7f5; border-radius: 4px; font-size: 12px; color: #1f2a1f; min-height: 24px; }
+
+  .pill { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+  .alert-row { background: #fbe1e1 !important; }
+  .warn-row { background: #fff4d6 !important; }
+  .ok-row { background: #f5f8f5 !important; }
+
+  .bar-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 11px; }
+  .bar-row .name { width: 110px; color: #6b7a6b; }
+  .bar-row .bar { flex: 1; height: 14px; background: #eef2ee; border-radius: 3px; overflow: hidden; }
+  .bar-row .bar > span { display: block; height: 100%; background: #4a8b5e; }
+  .bar-row .val { width: 130px; text-align: right; font-variant-numeric: tabular-nums; color: #1f2a1f; font-weight: 600; }
+
+  /* Calendar */
+  .cal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .cal-head h3 { margin: 0; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; background: #e3e6e3; border-radius: 6px; overflow: hidden; }
+  .cal-grid .dow { background: #2d5a3d; color: #fff; text-align: center; font-size: 11px; padding: 6px 4px; font-weight: 600; }
+  .cal-cell { background: #fff; min-height: 90px; padding: 4px 6px; font-size: 10px; }
+  .cal-cell.other { background: #f5f7f5; color: #b0b8b0; }
+  .cal-cell.today { background: #fffceb; }
+  .cal-cell .date { font-weight: 700; color: #2d5a3d; margin-bottom: 2px; }
+  .cal-event { background: #c9e2d2; color: #1f4a30; padding: 1px 4px; border-radius: 3px; margin: 2px 0; cursor: pointer; line-height: 1.3; }
+  .cal-event.deadline { background: #fbe1e1; color: #a83232; }
+  .cal-event.due { background: #fff4d6; color: #8b6d1f; }
+  .cal-event.contract { background: #d6d0e2; color: #3a2f55; }
+
+  /* Report */
+  .report-output { background: #fff; padding: 30px; border-radius: 8px; border: 1px solid #e3e6e3; margin-top: 12px; }
+  .report-output h1 { color: #2d5a3d; font-size: 22px; margin: 0 0 4px; }
+  .report-output .sub-h { color: #6b7a6b; font-size: 12px; margin-bottom: 18px; }
+  .report-output h2 { color: #2d5a3d; font-size: 14px; border-bottom: 2px solid #2d5a3d; padding-bottom: 4px; margin-top: 20px; }
+  .report-output table { font-size: 11px; }
+  .report-output .biz-card { border: 1px solid #2d5a3d; padding: 10px 14px; border-radius: 6px; margin: 14px 0; background: #f5f8f5; font-size: 11px; }
+  .report-output .footer { margin-top: 30px; font-size: 10px; color: #6b7a6b; border-top: 1px solid #ccc; padding-top: 10px; }
+
+  .help-modal { width: 980px; }
+  .help-intro { background: #f5f8f5; border: 1px solid #dce8dc; border-radius: 8px; padding: 12px 14px; line-height: 1.7; margin-bottom: 14px; }
+  .help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .help-card { border: 1px solid #e2e8e2; border-radius: 8px; padding: 12px 14px; background: #fff; }
+  .help-card h4 { margin-top: 0; }
+  .help-card ul { margin: 6px 0 0 18px; padding: 0; line-height: 1.75; }
+  .help-card li { margin-bottom: 4px; }
+  .help-table th { width: 26%; }
+  .help-table td { line-height: 1.65; }
+  .app-switch-modal { width: 720px; }
+  .app-switch-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .app-tile { border: 1px solid #dfe8df; border-radius: 8px; padding: 14px; background: #fff; }
+  .app-tile.current { border-color: #2d5a3d; background: #f5f8f5; }
+  .app-tile h3 { margin: 0 0 6px; color: #2d5a3d; font-size: 14px; }
+  .app-tile p { margin: 0; color: #5d6f62; line-height: 1.65; font-size: 12px; }
+  .app-tile .tile-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .gp-tooltip { position: fixed; z-index: 1000; max-width: 320px; background: #1f2a1f; color: #fff; padding: 9px 11px; border-radius: 6px; font-size: 12px; line-height: 1.55; box-shadow: 0 10px 24px rgba(0,0,0,.22); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity .12s ease, transform .12s ease; }
+  .gp-tooltip.show { opacity: .96; transform: translateY(0); }
+  .gp-tooltip .tt-title { font-weight: 700; margin-bottom: 2px; }
+
+  @media (max-width: 980px) {
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .hero { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .stats { grid-template-columns: 1fr; }
+    .grid2, .grid3, .grid4 { grid-template-columns: 1fr; }
+  }
+
+  @media print {
+    body * { visibility: hidden; }
+    .report-output, .report-output * { visibility: visible; }
+    .report-output { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; border: none; }
+    .no-print { display: none !important; }
+    @page { size: A4; margin: 15mm; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GREEN PARTNERSHIP — 業務管理システム v4</h1>
+    <div class="sub">補助金顧問業務を一元管理 | 顧問先・担当・案件進捗・カレンダー・月次レポート</div>
+  </div>
+  <div class="header-right">
+    <div class="sub" id="lastSave"></div>
+    <button class="app-switch-button" onclick="openAppSwitch()" data-help="アプリ切替ウィンドウを開きます。1つのRenderサービス内でGP業務管理を開き直したり、別ウィンドウで開いたりできます。">アプリ切替</button>
+    <button class="help-button" onclick="openHelp()" aria-label="ヘルプを開く" data-help="詳しい操作説明を開きます。各ボタンの役割、日常操作、控え保存、社内URLの使い方まで確認できます。">?</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="active" data-tab="dash" onclick="switchTab('dash')">📊 トップ画面</button>
+  <button data-tab="clients" onclick="switchTab('clients')">🏢 顧問先</button>
+  <button data-tab="clientDetail" onclick="switchTab('clientDetail')" style="display:none;">顧問先詳細</button>
+  <button data-tab="chats" onclick="switchTab('chats')">💬 チャット相談</button>
+  <button data-tab="staff" onclick="switchTab('staff')">👥 担当者</button>
+  <button data-tab="pipeline" onclick="switchTab('pipeline')">📋 案件進捗</button>
+  <button data-tab="templates" onclick="switchTab('templates')">📑 書類ひな形</button>
+  <button data-tab="calendar" onclick="switchTab('calendar')">📅 カレンダー</button>
+  <button data-tab="report" onclick="switchTab('report')">📄 月次レポート</button>
+  <div class="spacer"></div>
+  <div class="global-actions">
+    <button onclick="reloadSavedData()">保存データ呼出</button>
+    <button onclick="exportAll()">控え保存</button>
+    <button onclick="document.getElementById('importFile').click()">控え読込</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importAll(event)">
+    <button onclick="loadSample()">練習データ追加</button>
+    <button onclick="clearWorkingState()">作業中クリア</button>
+  </div>
+</nav>
+
+<!-- ===== DASHBOARD ===== -->
+<div class="tab-content active" id="tab-dash">
+  <div class="hero" id="hero"></div>
+  <div class="stats" id="stat-main"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+    <div class="card-section"><h3>プラン別 顧問先構成（月額顧問料の内訳）</h3><div id="plan-breakdown"></div></div>
+    <div class="card-section"><h3>フェーズ別 案件数・金額</h3><div id="phase-breakdown"></div></div>
+  </div>
+  <div class="card-section"><h3>⚠️ 期日のお知らせ（要対応）</h3><div id="alert-list"></div></div>
+  <div class="card-section"><h3>紹介報酬 未払いのお知らせ</h3><div id="referral-alert-list"></div></div>
+  <div class="card-section"><h3>チャット相談 超過のお知らせ</h3><div id="chat-alert-list"></div></div>
+  <div class="card-section"><h3>解約予告中の顧問先</h3><div id="cancel-list"></div></div>
+</div>
+
+<!-- ===== CLIENTS ===== -->
+<div class="tab-content" id="tab-clients">
+  <div class="toolbar">
+    <button class="primary" onclick="openClientForm()">＋ 新規顧問先</button>
+    <select id="cFilterPlan" onchange="page.clients=1;renderClients()">
+      <option value="">プラン:全て</option>
+      <option>ミニ</option><option>スタンダード</option><option>プレミアム</option><option>スポット</option><option>未契約</option>
+    </select>
+    <input type="text" id="cFilterText" placeholder="企業名・業種で絞込" oninput="page.clients=1;renderClients()" style="min-width:180px">
+    <div class="spacer"></div>
+    <div style="font-size:11px;color:#6b7a6b;" id="cCount"></div>
+  </div>
+  <div id="clientsTable"></div>
+  <div class="pager" id="clientsPager"></div>
+</div>
+
+<!-- ===== CLIENT DETAIL ===== -->
+<div class="tab-content" id="tab-clientDetail">
+  <div class="toolbar">
+    <button onclick="switchTab('clients')">← 顧問先一覧へ</button>
+    <button onclick="openClientForm(currentClientDetailId)">顧問先を編集</button>
+    <button class="primary" onclick="openCaseForClient(currentClientDetailId)">＋ 案件追加</button>
+    <button class="primary" onclick="openChatForm(null,currentClientDetailId)">＋ 相談記録</button>
+  </div>
+  <div id="clientDetail"></div>
+</div>
+
+<!-- ===== CHAT CONSULTATIONS ===== -->
+<div class="tab-content" id="tab-chats">
+  <div class="toolbar">
+    <button class="primary" onclick="openChatForm()">＋ 相談記録</button>
+    <label style="margin:0;">対象月:</label>
+    <input type="month" id="chatMonth" onchange="renderChats()">
+    <select id="chatClientFilter" onchange="renderChats()"><option value="">顧問先:全て</option></select>
+    <div class="spacer"></div>
+    <div style="font-size:11px;color:#6b7a6b;" id="chatCount"></div>
+  </div>
+  <div id="chatUsageTable"></div>
+  <div class="card-section"><h3>相談記録</h3><div id="chatLogTable"></div></div>
+</div>
+
+<!-- ===== STAFF ===== -->
+<div class="tab-content" id="tab-staff">
+  <div class="toolbar">
+    <button class="primary" onclick="openStaffForm()">＋ 新規担当者</button>
+    <div class="spacer"></div>
+    <div style="font-size:11px;color:#6b7a6b;" id="sCount"></div>
+  </div>
+  <div id="staffTable"></div>
+</div>
+
+<!-- ===== PIPELINE ===== -->
+<div class="tab-content" id="tab-pipeline">
+  <div class="toolbar">
+    <button class="primary" onclick="openCaseForm()">＋ 新規案件</button>
+    <button onclick="setPipelineView('kanban')" id="btnKb">カード表示</button>
+    <button onclick="setPipelineView('table')" id="btnTb">一覧表示</button>
+    <select id="pFilterClient" onchange="page.pipeline=1;renderPipeline()"><option value="">顧問先:全て</option></select>
+    <select id="pFilterStaff" onchange="page.pipeline=1;renderPipeline()"><option value="">担当:全て</option></select>
+    <select id="pFilterPhase" onchange="page.pipeline=1;renderPipeline()">
+      <option value="">フェーズ:全て</option>
+      <option>受注前</option><option>申請準備</option><option>申請・審査</option><option>採択後実施</option><option>完了</option>
+    </select>
+    <input type="text" id="pFilterText" placeholder="補助金名で絞込" oninput="page.pipeline=1;renderPipeline()" style="min-width:140px">
+    <div class="spacer"></div>
+    <div style="font-size:11px;color:#6b7a6b;" id="pCount"></div>
+  </div>
+  <div id="kanban" style="display:flex;"></div>
+  <div id="pipelineTable" style="display:none;"></div>
+  <div class="pager" id="pipelinePager" style="display:none;"></div>
+</div>
+
+<!-- ===== DOCUMENT TEMPLATES ===== -->
+<div class="tab-content" id="tab-templates">
+  <div class="toolbar">
+    <button class="primary" onclick="openTemplateForm()">＋ 新規ひな形</button>
+    <button onclick="resetTemplatesToDefault()">既定に戻す</button>
+    <div class="spacer"></div>
+    <div style="font-size:11px;color:#6b7a6b;" id="tplCount"></div>
+  </div>
+  <div id="templatesTable"></div>
+</div>
+
+<!-- ===== CALENDAR ===== -->
+<div class="tab-content" id="tab-calendar">
+  <div class="cal-head">
+    <button onclick="calMove(-1)">← 前月</button>
+    <h3 id="calTitle"></h3>
+    <button onclick="calMove(1)">翌月 →</button>
+    <button onclick="calMove(0)">今月</button>
+  </div>
+  <div style="font-size:11px;color:#6b7a6b;margin-bottom:6px;">
+    <span class="cal-event deadline" style="display:inline-block;padding:1px 6px;">公募締切</span>
+    <span class="cal-event due" style="display:inline-block;padding:1px 6px;">次アクション期日</span>
+    <span class="cal-event" style="display:inline-block;padding:1px 6px;">採択発表</span>
+    <span class="cal-event contract" style="display:inline-block;padding:1px 6px;">解約予告期限</span>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+</div>
+
+<!-- ===== MONTHLY REPORT ===== -->
+<div class="tab-content" id="tab-report">
+  <div class="card-section no-print">
+    <h3>月次レポート生成</h3>
+    <div class="toolbar">
+      <label style="margin:0;">対象顧問先:</label>
+      <select id="rpClient" style="min-width:200px;"></select>
+      <label style="margin:0;">対象月:</label>
+      <input type="month" id="rpMonth">
+      <button class="primary" onclick="generateReport()">レポート生成</button>
+      <button onclick="window.print()" id="rpPrintBtn" style="display:none;">🖨️ 印刷 / PDF保存</button>
+    </div>
+    <div style="font-size:11px;color:#6b7a6b;margin-top:6px;">
+      ※「PDFとして保存」は印刷画面の保存先で「PDFに保存」を選択
+    </div>
+    <h4 style="margin-top:14px;">月次キュレーション補助金情報（オプション）</h4>
+    <textarea id="rpCuration" rows="3" style="width:100%;padding:6px;border:1px solid #cfd6cf;border-radius:4px;font-size:12px;" placeholder="今月御社に該当する可能性の高い補助金: ①〇〇補助金 第〇回(締切 〇/〇) ②…"></textarea>
+  </div>
+  <div class="report-output" id="reportOutput" style="display:none;"></div>
+</div>
+
+<!-- ===== Client Modal ===== -->
+<div class="modal-bg" id="clientModal">
+  <div class="modal">
+    <h2 id="clientModalTitle">新規顧問先</h2>
+    <div class="grid2">
+      <div><label>企業名・屋号 *</label><input id="cl_name" type="text"></div>
+      <div><label>業種</label><input id="cl_industry" type="text" placeholder="製造業／飲食／IT 等"></div>
+    </div>
+    <div class="grid4">
+      <div><label>区分</label><select id="cl_type"><option>法人</option><option>個人事業主</option></select></div>
+      <div><label>従業員数</label><select id="cl_employees"><option>1人</option><option>2〜5人</option><option>6〜20人</option><option>21〜50人</option><option>51〜100人</option><option>101人以上</option></select></div>
+      <div><label>年商区分</label><select id="cl_revenue"><option>〜1千万円</option><option>1千万〜3千万</option><option>3千万〜1億</option><option>1億〜3億</option><option>3億〜10億</option><option>10億以上</option></select></div>
+      <div><label>都道府県</label><input id="cl_pref" type="text"></div>
+    </div>
+    <h4>窓口担当者</h4>
+    <div class="grid2">
+      <div><label>氏名</label><input id="cl_contact" type="text"></div>
+      <div><label>メール</label><input id="cl_email" type="email"></div>
+    </div>
+    <h4>契約情報</h4>
+    <div class="grid4">
+      <div><label>プラン</label><select id="cl_plan"><option>未契約</option><option>ミニ</option><option selected>スタンダード</option><option>プレミアム</option><option>スポット</option></select></div>
+      <div><label>契約開始日</label><input id="cl_start" type="date"></div>
+      <div><label>解約予告日</label><input id="cl_notice" type="date"></div>
+      <div><label>担当顧問</label><select id="cl_staff"></select></div>
+    </div>
+    <label>メモ</label>
+    <textarea id="cl_notes"></textarea>
+    <div class="actions">
+      <button class="danger" id="cl_btnDelete" onclick="deleteClient()" style="margin-right:auto;display:none">削除</button>
+      <button onclick="closeModal('clientModal')">キャンセル</button>
+      <button class="primary" onclick="saveClient()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Staff Modal ===== -->
+<div class="modal-bg" id="staffModal">
+  <div class="modal" style="width:480px;">
+    <h2 id="staffModalTitle">新規担当者</h2>
+    <div class="grid2">
+      <div><label>氏名 *</label><input id="st_name" type="text"></div>
+      <div><label>役割</label><input id="st_role" type="text" placeholder="代表／顧問／アシスタント 等"></div>
+    </div>
+    <label>メール</label><input id="st_email" type="email">
+    <label>メモ</label><textarea id="st_memo"></textarea>
+    <div class="actions">
+      <button class="danger" id="st_btnDelete" onclick="deleteStaff()" style="margin-right:auto;display:none">削除</button>
+      <button onclick="closeModal('staffModal')">キャンセル</button>
+      <button class="primary" onclick="saveStaff()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Case Modal ===== -->
+<div class="modal-bg" id="caseModal">
+  <div class="modal">
+    <h2 id="caseModalTitle">新規案件</h2>
+    <h4>基本情報</h4>
+    <div class="grid2">
+      <div><label>顧問先 *</label><select id="ca_client" onchange="onClientChange()"></select></div>
+      <div><label>自社担当者</label><select id="ca_staff"></select></div>
+    </div>
+    <div class="grid3">
+      <div><label>補助金の書類ひな形</label><select id="ca_template" onchange="applyTemplate()"></select></div>
+      <div><label>補助金名 *</label><input id="ca_subsidy" type="text" placeholder="ものづくり補助金 等"></div>
+      <div><label>公募回次</label><input id="ca_round" type="text" placeholder="第20次"></div>
+    </div>
+    <div class="grid3">
+      <div><label>公募締切日</label><input id="ca_deadline" type="date"></div>
+      <div><label>採択発表予定日</label><input id="ca_resdate" type="date"></div>
+      <div><label>申請日</label><input id="ca_apdate" type="date"></div>
+    </div>
+
+    <h4>金額</h4>
+    <div class="grid4">
+      <div><label>補助率</label><select id="ca_subrate"><option value="">-</option><option value="50">1/2 (50%)</option><option value="66.67">2/3 (66.67%)</option><option value="75">3/4 (75%)</option><option value="100">10/10 (100%)</option></select></div>
+      <div><label>補助上限額(万円)</label><input id="ca_cap" type="number" min="0"></div>
+      <div><label>申請額(万円)</label><input id="ca_apply" type="number" min="0" oninput="updateCalc()"></div>
+      <div><label>自己負担(万円)</label><div class="readonly-val" id="ca_self">-</div></div>
+    </div>
+    <div class="grid4">
+      <div><label>採択額(万円)</label><input id="ca_award" type="number" min="0" oninput="updateCalc()"></div>
+      <div><label>成功報酬率(%)</label><input id="ca_rate" type="number" min="0" step="0.5" oninput="updateCalc()"></div>
+      <div><label>成功報酬額(万円)</label><div class="readonly-val" id="ca_fee">-</div></div>
+      <div><label>着手金(万円)</label><input id="ca_retainer" type="number" min="0"></div>
+    </div>
+
+    <h4>進捗</h4>
+    <div class="grid3">
+      <div><label>進み具合</label><select id="ca_stage"></select></div>
+      <div><label>不採択時サブ</label><select id="ca_sub"><option value="">-</option><option>再申請検討中</option><option>再申請決定</option><option>断念</option></select></div>
+      <div><label>次アクション期日</label><input id="ca_due" type="date"></div>
+    </div>
+    <div><label>次アクション内容</label><input id="ca_action" type="text" placeholder="加点要件確認／賃金台帳取り寄せ 等"></div>
+    <div class="grid4">
+      <div><label>交付決定日</label><input id="ca_grdate" type="date"></div>
+      <div><label>事業実施 開始</label><input id="ca_execs" type="date"></div>
+      <div><label>事業実施 終了</label><input id="ca_exece" type="date"></div>
+      <div><label>実績報告期限</label><input id="ca_repdue" type="date"></div>
+    </div>
+
+    <h4>必要書類チェック</h4>
+    <div id="docsContainer"></div>
+    <div style="margin-top:8px;">
+      <label style="font-size:10px;">追加書類（カンマ区切り）</label>
+      <input id="ca_docs_custom" type="text" placeholder="認定支援機関確認書, 加点書類A, …">
+    </div>
+
+    <h4>紹介管理</h4>
+    <div class="grid4">
+      <div><label>紹介元</label><input id="ca_refsrc" type="text" placeholder="顧問先名 or 直接"></div>
+      <div><label>紹介報酬率(%)</label><input id="ca_refrate" type="number" min="0" step="0.5" value="5" oninput="updateCalc()"></div>
+      <div><label>紹介報酬額(万円)</label><div class="readonly-val" id="ca_refamt">-</div></div>
+      <div><label>支払予定日</label><input id="ca_refdate" type="date"></div>
+    </div>
+    <label><input id="ca_refpaid" type="checkbox"> 紹介報酬 支払済</label>
+
+    <h4>メモ</h4>
+    <div class="grid3">
+      <div><label>一般メモ</label><textarea id="ca_memo"></textarea></div>
+      <div><label>加点要件メモ</label><textarea id="ca_kasanten"></textarea></div>
+      <div><label>審査員視点メモ</label><textarea id="ca_shinsa"></textarea></div>
+    </div>
+
+    <div class="actions">
+      <button class="danger" id="ca_btnDelete" onclick="deleteCase()" style="margin-right:auto;display:none">削除</button>
+      <button onclick="closeModal('caseModal')">キャンセル</button>
+      <button class="primary" onclick="saveCase()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Template Modal ===== -->
+<div class="modal-bg" id="templateModal">
+  <div class="modal">
+    <h2 id="templateModalTitle">新規書類ひな形</h2>
+    <div class="grid3">
+      <div><label>ひな形名 *</label><input id="tpl_key" type="text" placeholder="例: 事業再構築"></div>
+      <div><label>表示名 *</label><input id="tpl_label" type="text" placeholder="例: 事業再構築補助金"></div>
+      <div><label>標準補助率(%)</label><input id="tpl_rate" type="number" min="0" step="0.01"></div>
+    </div>
+    <h4>申請必須書類</h4>
+    <textarea id="tpl_apply_apply" rows="7" placeholder="1行に1書類"></textarea>
+    <h4>計画書作成資料</h4>
+    <textarea id="tpl_apply_plan" rows="7" placeholder="1行に1書類"></textarea>
+    <h4>加点書類（任意）</h4>
+    <textarea id="tpl_apply_bonus" rows="5" placeholder="1行に1書類"></textarea>
+    <div class="actions">
+      <button class="danger" id="tpl_btnDelete" onclick="deleteTemplate()" style="margin-right:auto;display:none">削除</button>
+      <button onclick="closeModal('templateModal')">キャンセル</button>
+      <button class="primary" onclick="saveTemplate()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Chat Modal ===== -->
+<div class="modal-bg" id="chatModal">
+  <div class="modal" style="width:560px;">
+    <h2 id="chatModalTitle">チャット相談を記録</h2>
+    <div class="grid2">
+      <div><label>顧問先 *</label><select id="ch_client"></select></div>
+      <div><label>相談日 *</label><input id="ch_date" type="date"></div>
+    </div>
+    <div class="grid2">
+      <div><label>対応者</label><select id="ch_staff"></select></div>
+      <div><label>件数</label><input id="ch_count" type="number" min="1" step="1" value="1"></div>
+    </div>
+    <label>相談内容メモ</label>
+    <textarea id="ch_summary" placeholder="例: ものづくり補助金の対象経費確認、見積書の要件相談"></textarea>
+    <div class="actions">
+      <button class="danger" id="ch_btnDelete" onclick="deleteChat()" style="margin-right:auto;display:none">削除</button>
+      <button onclick="closeModal('chatModal')">キャンセル</button>
+      <button class="primary" onclick="saveChat()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== App Switch Modal ===== -->
+<div class="modal-bg" id="appSwitchModal">
+  <div class="modal app-switch-modal">
+    <h2>アプリ切替</h2>
+    <div class="help-intro">
+      Renderの同じURL内でGP業務管理を開くための切替ウィンドウです。
+      別画面から戻るときは、この画面を開いて「GP業務管理を開く」を押してください。
+    </div>
+    <div class="app-switch-grid">
+      <div class="app-tile current">
+        <h3>GREEN PARTNERSHIP 業務管理</h3>
+        <p>顧問先、案件進捗、チャット相談、書類ひな形、カレンダー、月次レポートをまとめて管理します。</p>
+        <div class="tile-actions">
+          <button class="primary" onclick="goToGpApp(false)">GP業務管理を開く</button>
+          <button onclick="goToGpApp(true)">別ウィンドウで開く</button>
+        </div>
+      </div>
+      <div class="app-tile">
+        <h3>アプリ切替用URL</h3>
+        <p>他の画面から切り替えるボタンを作る場合は、同じサービス内の /app-switch にリンクしてください。</p>
+        <div class="tile-actions">
+          <button onclick="copyAppSwitchUrl()">切替URLをコピー</button>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button onclick="closeModal('appSwitchModal')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Help Modal ===== -->
+<div class="modal-bg" id="helpModal">
+  <div class="modal help-modal">
+    <h2>操作ヘルプ・ボタン解説</h2>
+    <div class="help-intro">
+      この画面は、Green Partnershipの補助金顧問業務を一元管理するための業務アプリです。
+      顧問先、担当者、申請案件、相談件数、紹介報酬、月次レポートを1つの画面で扱えます。
+      画面内のボタンにマウスを少し止めると簡単な説明が表示されます。さらに詳しく知りたい場合は、このヘルプを開いて確認してください。
+    </div>
+
+    <div class="help-grid">
+      <div class="help-card">
+        <h4>基本の考え方</h4>
+        <ul>
+          <li>社内用URLでは、このPCにある社内共有データへ保存されます。外部のサービスへ顧問先情報を送信しません。</li>
+          <li>複数人が同じ社内用URLを開くと、同じ共有データを検索・追加・更新できます。</li>
+          <li>プライベート用URLも同じ共有データを使います。直接HTMLファイルで開いた場合だけ、このブラウザ内保存に切り替わります。</li>
+          <li>重要な更新前後は右上の「控え保存」で、復元用の控えファイルを保存してください。</li>
+        </ul>
+      </div>
+      <div class="help-card">
+        <h4>毎日のおすすめ操作</h4>
+        <ul>
+          <li>最初にトップ画面で期日超過、7日以内、紹介報酬未払い、相談件数の超過を確認します。</li>
+          <li>次に案件進捗で、案件の進み具合と次にやることを確認します。</li>
+          <li>相談対応をしたら「チャット相談」で相談記録を追加します。</li>
+          <li>月末には月次レポートで顧問先別の報告書を作成し、PDF（保存用の書類ファイル）として保存します。</li>
+        </ul>
+      </div>
+      <div class="help-card">
+        <h4>安全対策・控え保存</h4>
+        <ul>
+          <li>控え読込時は、不要または危険な項目を取り除いてから保存データを整えます。</li>
+          <li>クラウド送信は使いません。通信はこのPCの共有保存と、同じ社内ネットワークから見るための社内用URLに限ります。</li>
+          <li>社内パソコンから開けない場合は、同梱の通信許可ファイルを管理者として実行してください。</li>
+          <li>控えファイルには顧問先情報が入るため、社外へ共有しないでください。</li>
+        </ul>
+      </div>
+    </div>
+
+    <h4>画面上部・共通ボタン</h4>
+    <table class="help-table">
+      <tr><th>アプリ切替</th><td>GP業務管理へ戻るための切替ウィンドウを開きます。1つのRenderサービスに複数画面をまとめる場合、別画面からこの業務管理へ戻る入口として使います。</td></tr>
+      <tr><th>?</th><td>このヘルプを開きます。各画面の使い方、ボタンの役割、日常運用、控え保存の方法を確認できます。</td></tr>
+      <tr><th>保存データ呼出</th><td>社内共有データの最新内容を呼び出し、画面を保存済みの状態へ戻します。入力フォームに未保存の内容がある場合は破棄されます。保存済みデータ自体は変更しません。</td></tr>
+      <tr><th>控え保存</th><td>現在の全データを復元用の控えファイルとして保存します。定期的な控え、パソコン移行、誤操作前の保険として使います。</td></tr>
+      <tr><th>控え読込</th><td>控え保存で作成したファイルを読み込みます。読み込むと現在の保存データを置き換えるため、実行前に確認画面が出ます。</td></tr>
+      <tr><th>練習データ追加</th><td>操作練習用の担当者、顧問先、案件、相談記録を追加します。本番データに混ぜたくない場合は使用前に控え保存してください。</td></tr>
+      <tr><th>作業中クリア</th><td>保存済みデータを消さず、入力中フォーム、検索条件、レポートの一時表示など、画面上で作業中の状態だけを片付けます。顧問先・案件・相談記録などの保存データは残ります。</td></tr>
+    </table>
+
+    <h4>画面別の操作</h4>
+    <table class="help-table">
+      <tr><th>トップ画面</th><td>売上見込み、月額顧問料、採択率、期日のお知らせ、紹介報酬未払い、相談件数の超過、解約予告を確認します。朝一番の確認画面として使います。「開く」は該当案件や顧問先を直接開き、「支払済」は紹介報酬の未払い状態を解消します。</td></tr>
+      <tr><th>顧問先</th><td>顧問先の基本情報を登録・編集します。行をクリックすると顧問先詳細へ移動します。「新規顧問先」は企業名、契約プラン、担当者、解約予告日などを登録します。「詳細」は採択履歴や相談履歴をまとめて見ます。</td></tr>
+      <tr><th>顧問先詳細</th><td>顧問先ごとの案件総数、採択件数、申請額累計、採択額累計、成功報酬累計、当月チャット件数を確認します。「案件追加」はその顧問先に紐づく案件を作成し、「相談記録」はその顧問先のチャット相談を記録します。</td></tr>
+      <tr><th>チャット相談</th><td>相談日、顧問先、対応者、件数、相談内容を記録します。ミニプランは月10件までを自動集計し、超過件数と超過料金を表示します。</td></tr>
+      <tr><th>担当者</th><td>社内担当者を登録します。顧問先や案件に担当者を割り当てることで、担当別の管理がしやすくなります。</td></tr>
+      <tr><th>案件進捗</th><td>申請案件を進み具合ごとに管理します。カード表示では案件カードを動かして進み具合を変更できます。一覧表示では金額や期日を表で確認できます。</td></tr>
+      <tr><th>書類ひな形</th><td>補助金ごとの必要書類リストを追加・編集・削除・並び替えできます。案件フォームでひな形を選ぶと、申請必須書類、計画書作成資料、加点書類がチェックリストとして表示されます。</td></tr>
+      <tr><th>カレンダー</th><td>公募締切、次アクション期日、採択発表予定、解約予告日を月単位で確認します。予定をクリックすると該当案件や顧問先を開けます。</td></tr>
+      <tr><th>月次レポート</th><td>顧問先と対象月を選んで、報告用の画面を作成します。「印刷 / PDF保存」で印刷画面を開き、PDF（保存用の書類ファイル）として保存できます。</td></tr>
+    </table>
+
+    <h4>入力フォーム内のボタン</h4>
+    <table class="help-table">
+      <tr><th>保存</th><td>入力内容をこの画面の保存場所に保存します。必須項目が不足している場合は警告が表示されます。</td></tr>
+      <tr><th>キャンセル</th><td>入力内容を保存せずにフォームを閉じます。閉じる前に必要な内容が保存済みか確認してください。</td></tr>
+      <tr><th>削除</th><td>顧問先、担当者、案件、書類ひな形、相談記録を削除します。関連データがある場合は確認画面が出ます。</td></tr>
+      <tr><th>既定に戻す</th><td>書類ひな形を初期状態へ戻します。案件データは残りますが、独自に編集したひな形の内容は上書きされます。</td></tr>
+      <tr><th>カード表示 / 一覧表示</th><td>案件進捗の表示形式を切り替えます。進み具合の確認はカード表示、金額や期日の確認は一覧表示が向いています。</td></tr>
+      <tr><th>前月 / 翌月 / 今月</th><td>カレンダーの表示月を移動します。締切や次アクションの見落とし防止に使います。</td></tr>
+    </table>
+
+    <h4>URL運用</h4>
+    <div class="help-intro">
+      プライベート用URLはこのパソコンだけで開く用途です。社内用URLは同じネットワーク内の別パソコンから見る用途です。
+      URLを検索欄で検索すると検索エラーになることがあるため、ブラウザのアドレスバーへ直接入力するか、
+      同梱の「GP_プライベート用URLを開く.cmd」「GP_社内用URLを開く.cmd」を使ってください。
+      再起動後も使えるよう、URLサーバーの自動起動は登録済みです。
+    </div>
+
+    <div class="actions">
+      <button class="primary" onclick="closeModal('helpModal')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================
+// CONFIG
+// =====================================================
+const STAGES = [
+  { name:"初回ヒアリング",          phase:"受注前",     pc:"phase-pre" },
+  { name:"適合診断",                phase:"受注前",     pc:"phase-pre" },
+  { name:"提案・契約",              phase:"受注前",     pc:"phase-pre" },
+  { name:"計画策定中",              phase:"申請準備",   pc:"phase-prep" },
+  { name:"書類・申請書作成",        phase:"申請準備",   pc:"phase-prep" },
+  { name:"申請済・審査中",          phase:"申請・審査", pc:"phase-rev" },
+  { name:"採択",                    phase:"申請・審査", pc:"phase-rev" },
+  { name:"不採択",                  phase:"申請・審査", pc:"phase-rev" },
+  { name:"交付決定・事業実施中",    phase:"採択後実施", pc:"phase-post" },
+  { name:"実績報告中",              phase:"採択後実施", pc:"phase-post" },
+  { name:"入金完了",                phase:"完了",       pc:"phase-done" }
+];
+const STAGE_MIGRATION = {
+  "リード/問合せ":"初回ヒアリング","初回面談":"初回ヒアリング",
+  "提案・見積":"提案・契約","契約締結":"提案・契約",
+  "Gビズ/jGrants準備":"計画策定中",
+  "書類収集中":"書類・申請書作成","申請書作成中":"書類・申請書作成","顧問先最終確認":"書類・申請書作成",
+  "申請完了":"申請済・審査中","審査中":"申請済・審査中",
+  "交付決定":"交付決定・事業実施中","事業実施中":"交付決定・事業実施中"
+};
+const PHASES = ["受注前","申請準備","申請・審査","採択後実施","完了"];
+const MINI_PLAN = "ミニ";
+const LEGACY_MINI_PLAN = "\u30ce\u30fc\u30de\u30eb";
+const PLANS = ["未契約",MINI_PLAN,"スタンダード","プレミアム","スポット"];
+const PLAN_RATE = { [MINI_PLAN]:20, "スタンダード":9, "プレミアム":7, "スポット":15, "未契約":15 };
+const PLAN_FEE = { [MINI_PLAN]:15000, "スタンダード":30000, "プレミアム":60000, "スポット":0, "未契約":0 };
+const CLIENT_TYPES = ["法人","個人事業主"];
+const EMPLOYEE_OPTIONS = ["1人","2〜5人","6〜20人","21〜50人","51〜100人","101人以上"];
+const REVENUE_OPTIONS = ["〜1千万円","1千万〜3千万","3千万〜1億","1億〜3億","3億〜10億","10億以上"];
+const WON_STAGES = ["採択","交付決定・事業実施中","実績報告中","入金完了"];
+const DECIDED_STAGES = ["採択","不採択","交付決定・事業実施中","実績報告中","入金完了"];
+const CHAT_LIMIT_MINI = 10;
+const CHAT_OVERAGE_FEE = 2200;
+const STORAGE_SOFT_LIMIT = 4500000;
+
+// 補助金テンプレ別 必要書類リスト
+// 注: 2025-2026年公募要領を基にしたベース構成。最新公募回の要領で要確認
+const BUDGET_TEMPLATES = {
+  "": { label:"-- 選択 --", docs:{} },
+  "持続化": {
+    label:"小規模事業者持続化補助金（一般型）",
+    rate: 66.67,
+    apply_apply: [
+      "様式1：補助金交付申請書",
+      "様式2：経営計画書兼補助事業計画書①",
+      "様式3：補助事業計画書②（経費明細）",
+      "様式4：事業支援計画書（商工会・商工会議所発行）",
+      "決算書/確定申告書 ①最新期",
+      "決算書/確定申告書 ②前期",
+      "決算書/確定申告書 ③前々期",
+      "履歴事項全部証明書（法人・3ヶ月以内）",
+      "GビズIDプライム",
+      "見積書（補助対象経費がわかるもの）",
+      "本人確認書類（個人事業主のマイナンバーカード等）",
+      "開業届の写し（開業1年未満の個人事業主）",
+      "商工会議所会員/会員外区分の確認"
+    ],
+    apply_plan: [
+      "自社の強み/弱み分析（SWOT）",
+      "ターゲット顧客像・ペルソナ",
+      "競合分析（半径◯km・同業他社）",
+      "売上推移データ（3〜5期分）",
+      "既存商品・サービスのチラシ・写真",
+      "価格表・原価表",
+      "販路開拓策の数値根拠（来店数・客単価想定）",
+      "投資後の収支シミュレーション"
+    ],
+    apply_bonus: [
+      "適格請求書発行事業者登録通知書（インボイス枠）",
+      "賃金引上げ表明書（賃上げ枠）",
+      "事業継続力強化計画認定書",
+      "経営力向上計画認定書",
+      "卒業枠：雇用5名増加計画書"
+    ]
+  },
+  "ものづくり": {
+    label:"ものづくり補助金",
+    rate: 50,
+    apply_apply: [
+      "事業計画書（本文10ページ以内）",
+      "賃金引上げ計画の誓約書",
+      "決算書 ①最新期（貸借対照表・損益計算書・製造原価報告書・販管費明細・株主資本変動計算書・注記表）",
+      "決算書 ②前期",
+      "履歴事項全部証明書（法人・3ヶ月以内）",
+      "認定経営革新等支援機関による確認書",
+      "GビズIDプライム",
+      "見積書（税抜50万円以上の機械装置・システム）",
+      "カタログ・仕様書（取得予定機械）",
+      "賃金台帳（直近）"
+    ],
+    apply_plan: [
+      "5年事業計画（売上・付加価値額・経常利益・人件費の推移）",
+      "労働生産性向上指標（付加価値額/従業員数）の根拠",
+      "市場分析・競合分析",
+      "技術的優位性の説明資料",
+      "設備能力比較表（既存 vs 新規導入）",
+      "顧客需要の裏付け（引合書・LOI等）",
+      "人材育成計画",
+      "資金調達計画"
+    ],
+    apply_bonus: [
+      "経営革新計画 承認書",
+      "事業継続力強化計画 認定書",
+      "健康経営優良法人 認定書",
+      "賃上げ加点 表明書",
+      "パートナーシップ構築宣言",
+      "DX認定",
+      "再生事業者 該当書類"
+    ]
+  },
+  "省力化": {
+    label:"中小企業省力化投資補助金（カタログ型）",
+    rate: 50,
+    apply_apply: [
+      "事業計画書",
+      "決算書 ①最新期",
+      "決算書 ②前期",
+      "履歴事項全部証明書（法人）",
+      "GビズIDプライム",
+      "カタログ掲載製品の選定書（販売事業者経由）",
+      "効果測定計画書（労働生産性指標）",
+      "賃金引上げ計画の誓約書",
+      "販売事業者との共同申請書類"
+    ],
+    apply_plan: [
+      "人手不足の現状説明資料（求人実績・離職率等）",
+      "労働生産性 現状値・目標値（付加価値額/労働時間）",
+      "労働時間データ（部門別・直近6ヶ月）",
+      "売上・付加価値推移（3期分）",
+      "省力化導入後の業務フロー図",
+      "従業員数推移・賃金推移"
+    ],
+    apply_bonus: [
+      "賃上げ加点 表明書",
+      "事業継続力強化計画 認定書",
+      "最低賃金近傍事業者 証明"
+    ]
+  },
+  "新事業進出": {
+    label:"新事業進出補助金",
+    rate: 50,
+    apply_apply: [
+      "事業計画書（新規性・市場性・成長性を明示）",
+      "決算書 ①最新期",
+      "決算書 ②前期",
+      "履歴事項全部証明書（法人）",
+      "認定経営革新等支援機関による確認書",
+      "GビズIDプライム",
+      "見積書",
+      "既存事業との分離説明書",
+      "賃金引上げ計画の誓約書"
+    ],
+    apply_plan: [
+      "市場規模・成長性データ（出典付き）",
+      "新事業の競合分析・差別化要因",
+      "既存事業の売上構成比率（直近3期）",
+      "新事業の5年収支計画（売上・粗利・営業利益）",
+      "新事業の運営体制図・人員計画",
+      "顧客獲得計画（マーケティング戦略）",
+      "新事業のリスク分析・対策",
+      "資金調達計画（自己資金/借入/補助金）"
+    ],
+    apply_bonus: [
+      "賃上げ加点 表明書",
+      "事業継続力強化計画 認定書",
+      "パートナーシップ構築宣言",
+      "経営革新計画 承認書",
+      "DX認定"
+    ]
+  },
+  "IT導入": {
+    label:"IT導入補助金",
+    rate: 50,
+    apply_apply: [
+      "事業計画書",
+      "決算書 ①最新期",
+      "履歴事項全部証明書",
+      "GビズIDプライム",
+      "IT導入支援事業者との連携書類",
+      "対象ITツール選定書（IT導入支援事業者作成）",
+      "SECURITY ACTION 自己宣言"
+    ],
+    apply_plan: [
+      "現状業務フロー図",
+      "導入後業務フロー図",
+      "労働生産性向上の数値根拠",
+      "投資回収計画（ROI）"
+    ],
+    apply_bonus: [
+      "インボイス対応加点（適格請求書発行事業者登録通知書）",
+      "賃上げ加点 表明書",
+      "事業継続力強化計画 認定書"
+    ]
+  },
+  "汎用": {
+    label:"その他/汎用",
+    rate: 0,
+    apply_apply: [
+      "事業計画書",
+      "決算書 ①最新期",
+      "決算書 ②前期",
+      "履歴事項全部証明書",
+      "GビズIDプライム",
+      "見積書"
+    ],
+    apply_plan: [
+      "市場分析",
+      "競合分析",
+      "投資計画と回収シミュレーション"
+    ],
+    apply_bonus: []
+  }
+};
+
+const STORAGE_KEY = "gp_biz_mgmt_v4";
+const STORAGE_KEY_V3 = "gp_biz_mgmt_v3";
+const STORAGE_KEY_V2 = "gp_biz_mgmt_v2";
+const PAGE_SIZE = 20;
+
+// =====================================================
+// STATE
+// =====================================================
+let store = { clients: [], staff: [], cases: [], chats: [], templates: {} };
+let pipelineView = "kanban";
+let editingClientId = null, editingStaffId = null, editingCaseId = null, editingTemplateKey = null, editingChatId = null;
+let currentClientDetailId = null;
+let legacyPlanConverted = false;
+let sharedMode = false;
+let sharedRevision = 0;
+let sharedSaveInFlight = false;
+let sharedSaveQueued = false;
+let sharedRefreshTimer = null;
+let page = { clients:1, pipeline:1 };
+let calCursor = new Date();
+calCursor.setDate(1);
+
+// =====================================================
+// STORAGE
+// =====================================================
+function cloneTemplates(){
+  return JSON.parse(JSON.stringify(BUDGET_TEMPLATES));
+}
+function asList(v){
+  return Array.isArray(v) ? v.filter(x=>x!=null).map(String) : [];
+}
+function normalizeTemplate(tpl, fallbackLabel){
+  tpl = tpl || {};
+  return {
+    label: (tpl.label || fallbackLabel || '').trim(),
+    rate: parseFloat(tpl.rate) || 0,
+    apply_apply: asList(tpl.apply_apply),
+    apply_plan: asList(tpl.apply_plan),
+    apply_bonus: asList(tpl.apply_bonus)
+  };
+}
+function normalizeTemplateMap(templates){
+  const source = templates ? JSON.parse(JSON.stringify(templates)) : cloneTemplates();
+  if(!source[""]) source[""] = { label:"-- 選択 --" };
+  const normalized = { "": normalizeTemplate(source[""], "-- 選択 --") };
+  Object.keys(source).filter(k=>k!=="").forEach(k=>{
+    const key = String(k).trim();
+    if(!key) return;
+    normalized[key] = normalizeTemplate(source[k], key);
+  });
+  return normalized;
+}
+function safeJsonParse(text){
+  return JSON.parse(text, (key, value) => {
+    if(key === "__proto__" || key === "constructor" || key === "prototype") return undefined;
+    return value;
+  });
+}
+function textVal(v, max=2000){
+  return (v==null ? '' : String(v)).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
+}
+function numVal(v){
+  const n = parseFloat(v);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+function boolVal(v){ return v === true; }
+function dateVal(v){ return /^\d{4}-\d{2}-\d{2}$/.test(String(v||'')) ? String(v) : ''; }
+function optionVal(v, options, fallback){ return options.includes(v) ? v : fallback; }
+function normalizePlanName(v){
+  const plan = textVal(v, 40);
+  if(plan === LEGACY_MINI_PLAN){
+    legacyPlanConverted = true;
+    return MINI_PLAN;
+  }
+  return plan;
+}
+function normalizeDocs(docs){
+  const out = {};
+  if(docs && typeof docs === 'object' && !Array.isArray(docs)){
+    Object.keys(docs).forEach(k=>{
+      if(/^(apply|plan|bonus)_\d+$/.test(k)) out[k] = !!docs[k];
+    });
+  }
+  return out;
+}
+function normalizeClient(c){
+  c = c && typeof c === 'object' ? c : {};
+  return {
+    id: textVal(c.id, 80) || uid(),
+    name: textVal(c.name, 120),
+    industry: textVal(c.industry, 80),
+    type: optionVal(c.type, CLIENT_TYPES, "法人"),
+    employees: optionVal(c.employees, EMPLOYEE_OPTIONS, "1人"),
+    revenue: optionVal(c.revenue, REVENUE_OPTIONS, "〜1千万円"),
+    pref: textVal(c.pref, 30),
+    contact: textVal(c.contact, 80),
+    email: textVal(c.email, 120),
+    plan: optionVal(normalizePlanName(c.plan), PLANS, "未契約"),
+    start: dateVal(c.start),
+    notice: dateVal(c.notice),
+    staff_id: textVal(c.staff_id, 80),
+    notes: textVal(c.notes, 3000),
+    created: textVal(c.created, 40) || new Date().toISOString(),
+    updated: textVal(c.updated, 40)
+  };
+}
+function normalizeStaff(s){
+  s = s && typeof s === 'object' ? s : {};
+  return {
+    id: textVal(s.id, 80) || uid(),
+    name: textVal(s.name, 80),
+    role: textVal(s.role, 80),
+    email: textVal(s.email, 120),
+    memo: textVal(s.memo, 2000),
+    created: textVal(s.created, 40) || new Date().toISOString()
+  };
+}
+function normalizeCase(c){
+  c = c && typeof c === 'object' ? c : {};
+  const stage = STAGE_MIGRATION[c.stage] || c.stage;
+  return {
+    id: textVal(c.id, 80) || uid(),
+    client_id: textVal(c.client_id, 80),
+    staff_id: textVal(c.staff_id, 80),
+    template: textVal(c.template, 80),
+    subsidy: textVal(c.subsidy, 160),
+    round: textVal(c.round, 80),
+    deadline: dateVal(c.deadline),
+    sub_rate: numVal(c.sub_rate),
+    cap: numVal(c.cap),
+    apply: numVal(c.apply),
+    award: numVal(c.award),
+    rate: numVal(c.rate),
+    retainer: numVal(c.retainer),
+    stage: STAGES.some(s=>s.name===stage) ? stage : STAGES[0].name,
+    sub_status: ["","再申請検討中","再申請決定","断念"].includes(c.sub_status) ? c.sub_status : "",
+    due: dateVal(c.due),
+    action: textVal(c.action, 240),
+    ap_date: dateVal(c.ap_date),
+    res_date: dateVal(c.res_date),
+    gr_date: dateVal(c.gr_date),
+    rep_due: dateVal(c.rep_due),
+    exec_s: dateVal(c.exec_s),
+    exec_e: dateVal(c.exec_e),
+    docs: normalizeDocs(c.docs),
+    docs_custom: asList(c.docs_custom).map(x=>textVal(x, 160)).filter(Boolean),
+    ref_src: textVal(c.ref_src, 120),
+    ref_rate: numVal(c.ref_rate),
+    ref_date: dateVal(c.ref_date),
+    ref_paid: boolVal(c.ref_paid),
+    memo: textVal(c.memo, 3000),
+    kasanten: textVal(c.kasanten, 3000),
+    shinsa: textVal(c.shinsa, 3000),
+    created: textVal(c.created, 40) || new Date().toISOString(),
+    updated: textVal(c.updated, 40)
+  };
+}
+function normalizeChat(ch){
+  ch = ch && typeof ch === 'object' ? ch : {};
+  return {
+    id: textVal(ch.id, 80) || uid(),
+    client_id: textVal(ch.client_id, 80),
+    staff_id: textVal(ch.staff_id, 80),
+    date: dateVal(ch.date) || new Date().toISOString().slice(0,10),
+    count: Math.max(1, Math.min(99, Math.round(numVal(ch.count) || 1))),
+    summary: textVal(ch.summary, 2000),
+    created: textVal(ch.created, 40) || new Date().toISOString(),
+    updated: textVal(ch.updated, 40)
+  };
+}
+function normalizeStore(){
+  legacyPlanConverted = false;
+  if(!store || typeof store !== 'object') store = {};
+  if(!Array.isArray(store.clients)) store.clients = [];
+  if(!Array.isArray(store.staff)) store.staff = [];
+  if(!Array.isArray(store.cases)) store.cases = [];
+  if(!Array.isArray(store.chats)) store.chats = [];
+  store.templates = normalizeTemplateMap(store.templates);
+  store.clients = store.clients.map(normalizeClient).filter(c=>c.name);
+  store.staff = store.staff.map(normalizeStaff).filter(s=>s.name);
+  store.cases = store.cases.map(normalizeCase).filter(c=>c.subsidy);
+  store.chats = store.chats.map(normalizeChat).filter(ch=>ch.client_id && ch.date);
+}
+function emptyStore(){
+  return { clients:[], staff:[], cases:[], chats:[], templates:cloneTemplates() };
+}
+function hasBusinessData(data){
+  return !!(data && (
+    (Array.isArray(data.clients) && data.clients.length) ||
+    (Array.isArray(data.staff) && data.staff.length) ||
+    (Array.isArray(data.cases) && data.cases.length) ||
+    (Array.isArray(data.chats) && data.chats.length)
+  ));
+}
+function loadLocalStoreData(){
+  let migratedFrom = "";
+  let data = null;
+  try { data = safeJsonParse(localStorage.getItem(STORAGE_KEY)) || null; }
+  catch(e){ data = null; }
+  if(!data){
+    for(const key of [STORAGE_KEY_V3, STORAGE_KEY_V2]){
+      try {
+        const old = safeJsonParse(localStorage.getItem(key));
+        if(old && old.clients){
+          data = old;
+          migratedFrom = key;
+          break;
+        }
+      } catch(e){}
+    }
+  }
+  return { data: data || emptyStore(), migratedFrom };
+}
+function saveLocalCache(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); } catch(e){}
+}
+async function loadSharedStore(){
+  const local = loadLocalStoreData();
+  const res = await fetch('/api/store', { cache:'no-store' });
+  if(!res.ok) throw new Error('共有データを読み込めません');
+  const payload = await res.json();
+  sharedMode = true;
+  sharedRevision = Number(payload.revision || 0);
+  const serverData = payload.data || emptyStore();
+  if(!hasBusinessData(serverData) && hasBusinessData(local.data)){
+    store = local.data;
+    normalizeStore();
+    await persistSharedStore({ force:true, silent:true });
+    saveLocalCache();
+    document.getElementById('lastSave').textContent = "社内共有データへ移行済み: " + new Date().toLocaleString('ja-JP');
+    return;
+  }
+  store = serverData;
+  normalizeStore();
+  saveLocalCache();
+}
+async function load(){
+  sharedMode = false;
+  if(location.protocol === 'http:' || location.protocol === 'https:'){
+    try {
+      await loadSharedStore();
+      if(legacyPlanConverted) save({ force:true });
+      return;
+    } catch(e) {
+      console.warn(e);
+      alert('社内共有データに接続できませんでした。このブラウザ内の保存データで開きます。');
+    }
+  }
+  const local = loadLocalStoreData();
+  store = local.data;
+  normalizeStore();
+  if(local.migratedFrom || legacyPlanConverted){
+    save();
+  }
+  if(local.migratedFrom){
+    alert(`${local.migratedFrom} のデータをv4形式に移行しました`);
+  }
+}
+async function persistSharedStore(options={}){
+  if(!sharedMode) return false;
+  if(sharedSaveInFlight){
+    sharedSaveQueued = true;
+    return true;
+  }
+  sharedSaveInFlight = true;
+  try {
+    const res = await fetch('/api/store', {
+      method:'PUT',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ revision: sharedRevision, force: !!options.force, data: store })
+    });
+    const payload = await res.json().catch(()=>({}));
+    if(res.status === 409){
+      sharedRevision = Number(payload.revision || sharedRevision);
+      store = payload.data || store;
+      normalizeStore();
+      saveLocalCache();
+      renderCurrentTab();
+      if(!options.silent) alert('他の人が先に保存していたため、最新の社内共有データを読み込み直しました。もう一度内容を確認して保存してください。');
+      return false;
+    }
+    if(!res.ok || !payload.ok) throw new Error(payload.error || '共有保存に失敗しました');
+    sharedRevision = Number(payload.revision || sharedRevision);
+    saveLocalCache();
+    document.getElementById('lastSave').textContent = "社内共有保存: " + new Date().toLocaleString('ja-JP');
+    return true;
+  } catch(e){
+    console.warn(e);
+    document.getElementById('lastSave').textContent = "社内共有保存に失敗: " + new Date().toLocaleString('ja-JP');
+    if(!options.silent) alert('社内共有データへの保存に失敗しました。ネットワークまたは起動状態を確認してください。');
+    return false;
+  } finally {
+    sharedSaveInFlight = false;
+    if(sharedSaveQueued){
+      sharedSaveQueued = false;
+      persistSharedStore({ silent:true });
+    }
+  }
+}
+function save(options={}){
+  try {
+    const raw = JSON.stringify(store);
+    if(raw.length > STORAGE_SOFT_LIMIT){
+      alert('保存データが大きくなっています。不要な控えファイルや古い相談メモを整理してください。');
+      return false;
+    }
+    localStorage.setItem(STORAGE_KEY, raw);
+    if(sharedMode){
+      persistSharedStore(options);
+      document.getElementById('lastSave').textContent = "社内共有保存中: " + new Date().toLocaleString('ja-JP');
+    } else {
+      document.getElementById('lastSave').textContent = "このブラウザ内に保存: " + new Date().toLocaleString('ja-JP');
+    }
+    return true;
+  } catch(e){
+    alert('保存に失敗しました。ブラウザの保存容量を確認してください。');
+    return false;
+  }
+}
+function resetWorkingPointers(){
+  document.querySelectorAll('.modal-bg.show').forEach(m=>m.classList.remove('show'));
+  editingClientId = null;
+  editingStaffId = null;
+  editingCaseId = null;
+  editingTemplateKey = null;
+  editingChatId = null;
+  currentClientDetailId = null;
+  page = { clients:1, pipeline:1 };
+  pipelineView = "kanban";
+}
+async function reloadSavedData(){
+  if(!confirm('保存済みの最新データを呼び出して、画面を最新の保存状態に戻します。未保存の入力中内容は破棄されます。実行しますか？')) return;
+  resetWorkingPointers();
+  await load();
+  const reportOutput = document.getElementById('reportOutput');
+  if(reportOutput){ reportOutput.innerHTML = ''; reportOutput.style.display = 'none'; }
+  const printBtn = document.getElementById('rpPrintBtn');
+  if(printBtn) printBtn.style.display = 'none';
+  hideButtonTooltip();
+  switchTab('dash');
+  document.getElementById('lastSave').textContent = (sharedMode ? "社内共有データ呼出: " : "保存済みデータ呼出: ") + new Date().toLocaleString('ja-JP');
+}
+function clearWorkingState(){
+  if(!confirm('保存済みデータは削除せず、入力中フォーム・検索条件・一時表示だけをクリアします。実行しますか？')) return;
+  resetWorkingPointers();
+  ['cFilterText','pFilterText','rpCuration','ca_docs_custom'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  ['cFilterPlan','pFilterClient','pFilterStaff','pFilterPhase','chatClientFilter','rpClient'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  const chatMonth = document.getElementById('chatMonth');
+  if(chatMonth) chatMonth.value = currentMonth();
+  const importFile = document.getElementById('importFile');
+  if(importFile) importFile.value = '';
+  const reportOutput = document.getElementById('reportOutput');
+  if(reportOutput){ reportOutput.innerHTML = ''; reportOutput.style.display = 'none'; }
+  const printBtn = document.getElementById('rpPrintBtn');
+  if(printBtn) printBtn.style.display = 'none';
+  hideButtonTooltip();
+  switchTab('dash');
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function esc(s){ return (s==null?'':String(s)).replace(/[<>&"']/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c])); }
+function attr(s){ return esc(s).replace(/`/g, '&#96;'); }
+function getTemplates(){ if(!store.templates) store.templates = normalizeTemplateMap(); return store.templates; }
+function getTemplate(k){ const templates = getTemplates(); return templates[k] || templates[""]; }
+function templateEntries(includeBlank=false){ return Object.entries(getTemplates()).filter(([k])=>includeBlank || k!==""); }
+function linesToList(v){ return v.split(/\r?\n/).map(s=>s.trim()).filter(Boolean); }
+function fmt(n){ return (n==null||isNaN(n))?'0':Number(n).toLocaleString('ja-JP'); }
+function today0(){ const t=new Date(); t.setHours(0,0,0,0); return t; }
+function diffDays(dateStr){ if(!dateStr) return null; return Math.floor((new Date(dateStr)-today0())/86400000); }
+function dueClass(d){ const x=diffDays(d); if(x==null) return ''; if(x<0) return 'due-over'; if(x<=7) return 'due-soon'; return 'due-ok'; }
+function getStage(n){ return STAGES.find(s=>s.name===n) || STAGES[0]; }
+function clientById(id){ return store.clients.find(c=>c.id===id); }
+function staffById(id){ return store.staff.find(s=>s.id===id); }
+function ym(d){ return d.toISOString().slice(0,7); }
+function ymFromDate(dateStr){ return dateStr ? String(dateStr).slice(0,7) : ''; }
+function currentMonth(){ return new Date().toISOString().slice(0,7); }
+function isWonStage(stage){ return WON_STAGES.includes(stage); }
+function isReferralDue(c){ return isWonStage(c.stage) && !c.ref_paid && !!(c.ref_src||'').trim() && (c.ref_rate||0)>0; }
+function successFeeMan(c){ return (c.award||0) * (c.rate||0) / 100; }
+function referralFeeMan(c){ return (c.award||0) * (c.ref_rate||0) / 100; }
+function referralSummary(list){
+  return list.reduce((acc,c)=>{
+    const src = c.ref_src || '未設定';
+    acc[src] = (acc[src] || 0) + referralFeeMan(c);
+    return acc;
+  }, {});
+}
+function chatLimit(c){ return c && c.plan === MINI_PLAN ? CHAT_LIMIT_MINI : null; }
+function chatLogsFor(clientId, month){ return store.chats.filter(ch=>(!clientId || ch.client_id===clientId) && (!month || ymFromDate(ch.date)===month)); }
+function chatUsage(clientId, month){ return chatLogsFor(clientId, month).reduce((s,ch)=>s+(ch.count||1), 0); }
+function activeTabName(){
+  const active = document.querySelector('nav.tabs button.active[data-tab]');
+  return active ? active.dataset.tab : 'dash';
+}
+function renderCurrentTab(){
+  const t = activeTabName();
+  if(t==='dash') renderDash();
+  if(t==='clients') renderClients();
+  if(t==='clientDetail') renderClientDetail();
+  if(t==='chats') renderChats();
+  if(t==='staff') renderStaff();
+  if(t==='pipeline') renderPipeline();
+  if(t==='templates') renderTemplates();
+  if(t==='calendar') renderCalendar();
+  if(t==='report') initReport();
+}
+function hasOpenModal(){
+  return !!document.querySelector('.modal-bg.show');
+}
+async function refreshSharedStore(silent=true){
+  if(!sharedMode || sharedSaveInFlight || hasOpenModal()) return false;
+  try {
+    const res = await fetch('/api/store', { cache:'no-store' });
+    if(!res.ok) return false;
+    const payload = await res.json();
+    const rev = Number(payload.revision || 0);
+    if(rev > sharedRevision){
+      sharedRevision = rev;
+      store = payload.data || emptyStore();
+      normalizeStore();
+      saveLocalCache();
+      renderCurrentTab();
+      document.getElementById('lastSave').textContent = "社内共有データ更新: " + new Date().toLocaleString('ja-JP');
+    }
+    return true;
+  } catch(e){
+    if(!silent) alert('社内共有データを更新できませんでした。');
+    return false;
+  }
+}
+function startSharedRefresh(){
+  if(sharedRefreshTimer) clearInterval(sharedRefreshTimer);
+  sharedRefreshTimer = setInterval(()=>refreshSharedStore(true), 30000);
+}
+
+// =====================================================
+// TABS
+// =====================================================
+function switchTab(t){
+  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('nav.tabs button[data-tab]').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  const navBtn = document.querySelector(`nav.tabs button[data-tab="${t}"]`);
+  if(navBtn) navBtn.classList.add('active');
+  if(t==='dash') renderDash();
+  if(t==='clients') renderClients();
+  if(t==='clientDetail') renderClientDetail();
+  if(t==='chats') renderChats();
+  if(t==='staff') renderStaff();
+  if(t==='pipeline') renderPipeline();
+  if(t==='templates') renderTemplates();
+  if(t==='calendar') renderCalendar();
+  if(t==='report') initReport();
+}
+
+// =====================================================
+// PAGINATION
+// =====================================================
+function renderPager(containerId, total, currentPage, setter){
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const c = document.getElementById(containerId);
+  if(total <= PAGE_SIZE){ c.innerHTML = ''; return; }
+  let html = `<button onclick="${setter}(1)" ${currentPage===1?'disabled':''}>«</button>`;
+  html += `<button onclick="${setter}(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  const start = Math.max(1, currentPage-2);
+  const end = Math.min(totalPages, currentPage+2);
+  if(start>1) html += `<button onclick="${setter}(1)">1</button>${start>2?'<span class="info">…</span>':''}`;
+  for(let i=start;i<=end;i++) html += `<button class="${i===currentPage?'active':''}" onclick="${setter}(${i})">${i}</button>`;
+  if(end<totalPages) html += `${end<totalPages-1?'<span class="info">…</span>':''}<button onclick="${setter}(${totalPages})">${totalPages}</button>`;
+  html += `<button onclick="${setter}(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+  html += `<button onclick="${setter}(${totalPages})" ${currentPage===totalPages?'disabled':''}>»</button>`;
+  html += `<span class="info">${currentPage} / ${totalPages}ページ · ${total}件</span>`;
+  c.innerHTML = html;
+}
+function gotoClientsPage(p){ page.clients = p; renderClients(); }
+function gotoPipelinePage(p){ page.pipeline = p; renderPipeline(); }
+
+// =====================================================
+// CLIENTS
+// =====================================================
+function fillStaffSelect(sel, current){
+  sel.innerHTML = '<option value="">未割当</option>' + store.staff.map(s=>`<option value="${s.id}" ${s.id===current?'selected':''}>${esc(s.name)}</option>`).join('');
+}
+function openClientForm(id){
+  editingClientId = id||null;
+  fillStaffSelect(document.getElementById('cl_staff'), null);
+  if(id){
+    const c = clientById(id); if(!c) return;
+    document.getElementById('clientModalTitle').textContent = '顧問先を編集';
+    document.getElementById('cl_btnDelete').style.display = 'inline-block';
+    cl_name.value=c.name; cl_industry.value=c.industry||''; cl_type.value=c.type||'法人';
+    cl_employees.value=c.employees||'1人'; cl_revenue.value=c.revenue||'〜1千万円'; cl_pref.value=c.pref||'';
+    cl_contact.value=c.contact||''; cl_email.value=c.email||'';
+    cl_plan.value=c.plan||'スタンダード'; cl_start.value=c.start||''; cl_notice.value=c.notice||'';
+    fillStaffSelect(document.getElementById('cl_staff'), c.staff_id);
+    cl_notes.value=c.notes||'';
+  } else {
+    document.getElementById('clientModalTitle').textContent = '新規顧問先';
+    document.getElementById('cl_btnDelete').style.display = 'none';
+    ['cl_name','cl_industry','cl_pref','cl_contact','cl_email','cl_start','cl_notice','cl_notes'].forEach(k=>document.getElementById(k).value='');
+    cl_type.value='法人'; cl_employees.value='1人'; cl_revenue.value='〜1千万円'; cl_plan.value='スタンダード';
+  }
+  document.getElementById('clientModal').classList.add('show');
+}
+function saveClient(){
+  const name = cl_name.value.trim();
+  if(!name){ alert('企業名は必須'); return; }
+  const data = {
+    name, industry:cl_industry.value.trim(), type:cl_type.value, employees:cl_employees.value,
+    revenue:cl_revenue.value, pref:cl_pref.value.trim(), contact:cl_contact.value.trim(),
+    email:cl_email.value.trim(), plan:cl_plan.value, start:cl_start.value, notice:cl_notice.value,
+    staff_id:cl_staff.value, notes:cl_notes.value, updated:new Date().toISOString()
+  };
+  if(editingClientId){ Object.assign(clientById(editingClientId), data); }
+  else { store.clients.push({ id:uid(), created:new Date().toISOString(), ...data }); }
+  save(); closeModal('clientModal'); renderClients(); renderDash();
+}
+function deleteClient(){
+  if(!editingClientId) return;
+  const used = store.cases.filter(c=>c.client_id===editingClientId).length;
+  if(used && !confirm(`関連案件が${used}件あります。顧問先のみ削除しますか？（案件は残ります）`)) return;
+  if(!used && !confirm('削除しますか？')) return;
+  if(used) store.cases.forEach(c=>{ if(c.client_id===editingClientId) c.client_id=''; });
+  store.clients = store.clients.filter(c=>c.id!==editingClientId);
+  save(); closeModal('clientModal'); renderClients(); renderDash();
+}
+function renderClients(){
+  const p = document.getElementById('cFilterPlan').value;
+  const q = document.getElementById('cFilterText').value.toLowerCase();
+  const list = store.clients.filter(c => (!p||c.plan===p) && (!q||((c.name||'')+(c.industry||'')).toLowerCase().includes(q)));
+  document.getElementById('cCount').textContent = `${list.length} / ${store.clients.length}件`;
+  if(list.length===0){ document.getElementById('clientsTable').innerHTML = '<div class="empty">顧問先がありません。「＋ 新規顧問先」または「練習データ追加」から。</div>'; document.getElementById('clientsPager').innerHTML=''; return; }
+  const start = (page.clients-1)*PAGE_SIZE;
+  const pageList = list.slice(start, start+PAGE_SIZE);
+  document.getElementById('clientsTable').innerHTML = `<table>
+    <thead><tr><th>企業名</th><th>業種</th><th>区分</th><th>従業員</th><th>年商</th><th>所在地</th><th>プラン</th><th>契約開始</th><th>解約予告</th><th>担当</th><th>案件</th><th>当月相談</th><th></th></tr></thead>
+    <tbody>${pageList.map(c=>{
+      const cases = store.cases.filter(x=>x.client_id===c.id);
+      const noticeAlert = c.notice && diffDays(c.notice)!=null && diffDays(c.notice)<=180;
+      const chatN = chatUsage(c.id, currentMonth());
+      const over = chatLimit(c) && chatN > chatLimit(c);
+      return `<tr class="click-row ${noticeAlert||over?'warn-row':''}" onclick="openClientDetail('${attr(c.id)}')">
+        <td><b>${esc(c.name)}</b><br><span style="font-size:10px;color:#6b7a6b">${esc(c.contact||'')} ${esc(c.email||'')}</span></td>
+        <td>${esc(c.industry)}</td><td>${esc(c.type)}</td><td>${esc(c.employees)}</td><td>${esc(c.revenue)}</td><td>${esc(c.pref)}</td>
+        <td><span class="plan-tag plan-${c.plan}">${esc(c.plan)}</span></td>
+        <td style="font-size:11px">${c.start||'-'}</td>
+        <td style="font-size:11px">${c.notice?(noticeAlert?'⚠️ ':'')+c.notice:'-'}</td>
+        <td>${esc(staffById(c.staff_id)?.name||'-')}</td>
+        <td style="text-align:center">${cases.length}</td>
+        <td style="text-align:center">${over?'⚠️ ':''}${chatN}${chatLimit(c)?` / ${chatLimit(c)}`:''}</td>
+        <td><div class="inline-actions"><button onclick="event.stopPropagation();openClientDetail('${attr(c.id)}')">詳細</button><button onclick="event.stopPropagation();openClientForm('${attr(c.id)}')">編集</button></div></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  renderPager('clientsPager', list.length, page.clients, 'gotoClientsPage');
+}
+
+function openClientDetail(id){
+  currentClientDetailId = id;
+  switchTab('clientDetail');
+}
+function renderClientDetail(){
+  const c = clientById(currentClientDetailId);
+  if(!c){
+    document.getElementById('clientDetail').innerHTML = '<div class="empty">顧問先が選択されていません。</div>';
+    return;
+  }
+  const cases = store.cases.filter(x=>x.client_id===c.id);
+  const wonCases = cases.filter(x=>isWonStage(x.stage));
+  const decided = cases.filter(x=>DECIDED_STAGES.includes(x.stage));
+  const totalApply = cases.reduce((s,x)=>s+(x.apply||0),0);
+  const totalAward = wonCases.reduce((s,x)=>s+(x.award||0),0);
+  const totalFee = wonCases.reduce((s,x)=>s+successFeeMan(x),0);
+  const adoptionRate = decided.length ? Math.round(wonCases.length*100/decided.length) : 0;
+  const month = currentMonth();
+  const chatN = chatUsage(c.id, month);
+  const limit = chatLimit(c);
+  const excess = limit ? Math.max(0, chatN-limit) : 0;
+  const recentChats = chatLogsFor(c.id, '').sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,8);
+  document.getElementById('clientDetail').innerHTML = `
+    <div class="card-section">
+      <h3>${esc(c.name)} <span class="plan-tag plan-${c.plan}">${esc(c.plan)}</span></h3>
+      <table>
+        <tr><th style="width:18%">業種</th><td>${esc(c.industry||'-')}</td><th style="width:18%">担当</th><td>${esc(staffById(c.staff_id)?.name||'-')}</td></tr>
+        <tr><th>窓口</th><td>${esc(c.contact||'-')} ${c.email?'/ '+esc(c.email):''}</td><th>契約開始</th><td>${c.start||'-'}</td></tr>
+        <tr><th>所在地</th><td>${esc(c.pref||'-')}</td><th>メモ</th><td>${esc(c.notes||'-')}</td></tr>
+      </table>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="label">案件総数</div><div class="value">${cases.length}</div><div class="sub">進行中 ${cases.filter(x=>x.stage!=='入金完了').length}件</div></div>
+      <div class="stat"><div class="label">採択件数</div><div class="value">${wonCases.length}</div><div class="sub">採択率 ${adoptionRate}%</div></div>
+      <div class="stat"><div class="label">申請額累計</div><div class="value">${fmt(totalApply)}万</div><div class="sub">全案件ベース</div></div>
+      <div class="stat"><div class="label">採択額累計</div><div class="value">${fmt(totalAward)}万</div><div class="sub">採択以降ベース</div></div>
+      <div class="stat"><div class="label">成功報酬累計</div><div class="value">${fmt(Math.round(totalFee))}万</div><div class="sub">採択額×料率</div></div>
+      <div class="stat ${excess?'warn':''}"><div class="label">当月チャット</div><div class="value">${chatN}${limit?`/${limit}`:''}</div><div class="sub">${excess?`超過 ${excess}件 / ¥${fmt(excess*CHAT_OVERAGE_FEE)}`:'制限内'}</div></div>
+    </div>
+    <div class="card-section"><h3>採択履歴</h3>${renderCaseHistoryTable(wonCases, true)}</div>
+    <div class="card-section"><h3>全案件履歴</h3>${renderCaseHistoryTable(cases, false)}</div>
+    <div class="card-section"><h3>最近のチャット相談</h3>${renderChatLogRows(recentChats)}</div>
+  `;
+}
+function renderCaseHistoryTable(list, wonOnly){
+  if(list.length===0) return `<div class="empty">${wonOnly?'採択履歴':'案件'}がありません。</div>`;
+  const sorted = [...list].sort((a,b)=>(b.res_date||b.deadline||'').localeCompare(a.res_date||a.deadline||''));
+  return `<table>
+    <thead><tr><th>補助金</th><th>進み具合</th><th class="num">申請額</th><th class="num">採択額</th><th class="num">成功報酬</th><th>申請日</th><th>採択発表</th><th></th></tr></thead>
+    <tbody>${sorted.map(c=>`<tr>
+      <td><b>${esc(c.subsidy)}</b><br><span style="font-size:10px;color:#6b7a6b">${esc(c.round||'')}</span></td>
+      <td>${esc(c.stage)}</td>
+      <td class="num">${fmt(c.apply)}万</td>
+      <td class="num">${fmt(c.award)}万</td>
+      <td class="num">${fmt(Math.round(successFeeMan(c)))}万</td>
+      <td>${c.ap_date||'-'}</td><td>${c.res_date||'-'}</td>
+      <td><button onclick="openCaseForm('${attr(c.id)}')" style="font-size:11px;padding:3px 8px;">開く</button></td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+// =====================================================
+// STAFF
+// =====================================================
+function openStaffForm(id){
+  editingStaffId = id||null;
+  if(id){
+    const s = staffById(id); if(!s) return;
+    document.getElementById('staffModalTitle').textContent = '担当者を編集';
+    document.getElementById('st_btnDelete').style.display = 'inline-block';
+    st_name.value=s.name; st_role.value=s.role||''; st_email.value=s.email||''; st_memo.value=s.memo||'';
+  } else {
+    document.getElementById('staffModalTitle').textContent = '新規担当者';
+    document.getElementById('st_btnDelete').style.display = 'none';
+    ['st_name','st_role','st_email','st_memo'].forEach(k=>document.getElementById(k).value='');
+  }
+  document.getElementById('staffModal').classList.add('show');
+}
+function saveStaff(){
+  const name = st_name.value.trim(); if(!name){ alert('氏名は必須'); return; }
+  const data = { name, role:st_role.value.trim(), email:st_email.value.trim(), memo:st_memo.value };
+  if(editingStaffId) Object.assign(staffById(editingStaffId), data);
+  else store.staff.push({ id:uid(), created:new Date().toISOString(), ...data });
+  save(); closeModal('staffModal'); renderStaff();
+}
+function deleteStaff(){
+  if(!editingStaffId) return;
+  if(!confirm('削除しますか？関連顧問先・案件の担当は未割当に戻ります')) return;
+  store.clients.forEach(c=>{ if(c.staff_id===editingStaffId) c.staff_id=''; });
+  store.cases.forEach(c=>{ if(c.staff_id===editingStaffId) c.staff_id=''; });
+  store.staff = store.staff.filter(s=>s.id!==editingStaffId);
+  save(); closeModal('staffModal'); renderStaff();
+}
+function renderStaff(){
+  document.getElementById('sCount').textContent = `${store.staff.length}名`;
+  if(store.staff.length===0){ document.getElementById('staffTable').innerHTML = '<div class="empty">担当者がいません。先に登録してください。</div>'; return; }
+  document.getElementById('staffTable').innerHTML = `<table>
+    <thead><tr><th>氏名</th><th>役割</th><th>メール</th><th>担当顧問先</th><th>担当案件</th><th></th></tr></thead>
+    <tbody>${store.staff.map(s=>{
+      const cl = store.clients.filter(x=>x.staff_id===s.id).length;
+      const ca = store.cases.filter(x=>x.staff_id===s.id).length;
+      return `<tr>
+        <td><b>${esc(s.name)}</b></td><td>${esc(s.role)}</td><td>${esc(s.email)}</td>
+        <td style="text-align:center">${cl}</td><td style="text-align:center">${ca}</td>
+        <td><button onclick="openStaffForm('${s.id}')" style="font-size:11px;padding:3px 8px;">編集</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+// =====================================================
+// CHAT CONSULTATIONS
+// =====================================================
+function renderChats(){
+  const monthEl = document.getElementById('chatMonth');
+  if(!monthEl.value) monthEl.value = currentMonth();
+  const month = monthEl.value;
+  const filter = document.getElementById('chatClientFilter');
+  const current = filter.value;
+  filter.innerHTML = '<option value="">顧問先:全て</option>' + store.clients.map(c=>`<option value="${attr(c.id)}">${esc(c.name)} (${esc(c.plan)})</option>`).join('');
+  filter.value = store.clients.some(c=>c.id===current) ? current : '';
+  const clients = store.clients.filter(c=>!filter.value || c.id===filter.value);
+  const logs = chatLogsFor(filter.value, month).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const total = logs.reduce((s,ch)=>s+(ch.count||1),0);
+  const overClients = clients.filter(c=>chatLimit(c) && chatUsage(c.id, month)>chatLimit(c)).length;
+  document.getElementById('chatCount').textContent = `${month} / ${total}件${overClients?` / 超過${overClients}社`:''}`;
+  document.getElementById('chatUsageTable').innerHTML = clients.length ? `<table>
+    <thead><tr><th>顧問先</th><th>プラン</th><th class="num">当月件数</th><th>上限</th><th>状態</th><th class="num">超過料金</th><th></th></tr></thead>
+    <tbody>${clients.map(c=>{
+      const count = chatUsage(c.id, month);
+      const limit = chatLimit(c);
+      const excess = limit ? Math.max(0, count-limit) : 0;
+      return `<tr class="${excess?'warn-row':''}">
+        <td><b>${esc(c.name)}</b><br><span style="font-size:10px;color:#6b7a6b">${esc(staffById(c.staff_id)?.name||'-')}</span></td>
+        <td><span class="plan-tag plan-${c.plan}">${esc(c.plan)}</span></td>
+        <td class="num">${count}</td>
+        <td>${limit?`${limit}件/月`:'制限なし'}</td>
+        <td>${excess?`⚠️ ${excess}件超過`:'OK'}</td>
+        <td class="num">¥${fmt(excess*CHAT_OVERAGE_FEE)}</td>
+        <td><div class="inline-actions"><button onclick="openChatForm(null,'${attr(c.id)}')">記録</button><button onclick="openClientDetail('${attr(c.id)}')">詳細</button></div></td>
+      </tr>`;
+    }).join('')}</tbody></table>` : '<div class="empty">顧問先がありません。</div>';
+  document.getElementById('chatLogTable').innerHTML = renderChatLogRows(logs);
+}
+function renderChatLogRows(logs){
+  if(!logs || logs.length===0) return '<div class="empty">相談記録がありません。</div>';
+  return `<table>
+    <thead><tr><th>日付</th><th>顧問先</th><th>対応者</th><th class="num">件数</th><th>内容</th><th></th></tr></thead>
+    <tbody>${logs.map(ch=>{
+      const c = clientById(ch.client_id);
+      const s = staffById(ch.staff_id);
+      return `<tr>
+        <td>${ch.date}</td>
+        <td>${esc(c?.name||'-')}</td>
+        <td>${esc(s?.name||'-')}</td>
+        <td class="num">${ch.count||1}</td>
+        <td>${esc(ch.summary||'-')}</td>
+        <td><button onclick="openChatForm('${attr(ch.id)}')" style="font-size:11px;padding:3px 8px;">編集</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+function openChatForm(id, presetClientId){
+  editingChatId = id || null;
+  ch_client.innerHTML = '<option value="">-</option>' + store.clients.map(c=>`<option value="${attr(c.id)}">${esc(c.name)} (${esc(c.plan)})</option>`).join('');
+  fillStaffSelect(document.getElementById('ch_staff'), null);
+  if(id){
+    const ch = store.chats.find(x=>x.id===id); if(!ch) return;
+    document.getElementById('chatModalTitle').textContent = 'チャット相談を編集';
+    document.getElementById('ch_btnDelete').style.display = 'inline-block';
+    ch_client.value = ch.client_id || '';
+    fillStaffSelect(document.getElementById('ch_staff'), ch.staff_id);
+    ch_date.value = ch.date || new Date().toISOString().slice(0,10);
+    ch_count.value = ch.count || 1;
+    ch_summary.value = ch.summary || '';
+  } else {
+    document.getElementById('chatModalTitle').textContent = 'チャット相談を記録';
+    document.getElementById('ch_btnDelete').style.display = 'none';
+    ch_client.value = presetClientId || '';
+    ch_date.value = new Date().toISOString().slice(0,10);
+    ch_count.value = 1;
+    ch_summary.value = '';
+  }
+  document.getElementById('chatModal').classList.add('show');
+}
+function saveChat(){
+  if(!ch_client.value){ alert('顧問先を選択してください'); return; }
+  if(!ch_date.value){ alert('相談日を入力してください'); return; }
+  const data = normalizeChat({
+    client_id:ch_client.value,
+    staff_id:ch_staff.value,
+    date:ch_date.value,
+    count:ch_count.value,
+    summary:ch_summary.value,
+    updated:new Date().toISOString()
+  });
+  if(editingChatId){
+    const target = store.chats.find(x=>x.id===editingChatId);
+    if(target) Object.assign(target, data, { id:editingChatId, created:target.created });
+  } else {
+    store.chats.push({ id:uid(), created:new Date().toISOString(), ...data });
+  }
+  save(); closeModal('chatModal'); renderChats(); renderDash(); if(currentClientDetailId) renderClientDetail();
+}
+function deleteChat(){
+  if(!editingChatId) return;
+  if(!confirm('この相談記録を削除しますか？')) return;
+  store.chats = store.chats.filter(x=>x.id!==editingChatId);
+  save(); closeModal('chatModal'); renderChats(); renderDash(); if(currentClientDetailId) renderClientDetail();
+}
+
+// =====================================================
+// DOCUMENT TEMPLATES
+// =====================================================
+function renderTemplates(){
+  const entries = templateEntries(false);
+  document.getElementById('tplCount').textContent = `${entries.length}件`;
+  if(entries.length===0){
+    document.getElementById('templatesTable').innerHTML = '<div class="empty">書類ひな形がありません。「＋ 新規ひな形」から追加できます。</div>';
+    return;
+  }
+  document.getElementById('templatesTable').innerHTML = `<table>
+    <thead><tr><th>ひな形</th><th>標準補助率</th><th>書類数</th><th>利用中案件</th><th>並び替え</th><th></th></tr></thead>
+    <tbody>${entries.map(([k,t],i)=>{
+      const used = store.cases.filter(c=>c.template===k).length;
+      const docCount = (t.apply_apply||[]).length + (t.apply_plan||[]).length + (t.apply_bonus||[]).length;
+      return `<tr>
+        <td><b>${esc(t.label)}</b><br><span style="font-size:10px;color:#6b7a6b">${esc(k)}</span></td>
+        <td>${t.rate ? fmt(t.rate) + '%' : '-'}</td>
+        <td>${docCount}件 <span style="font-size:10px;color:#6b7a6b">必須${(t.apply_apply||[]).length} / 計画${(t.apply_plan||[]).length} / 加点${(t.apply_bonus||[]).length}</span></td>
+        <td>${used}件</td>
+        <td>
+          <button data-key="${esc(k)}" onclick="moveTemplate(this.dataset.key,-1)" ${i===0?'disabled':''}>↑</button>
+          <button data-key="${esc(k)}" onclick="moveTemplate(this.dataset.key,1)" ${i===entries.length-1?'disabled':''}>↓</button>
+        </td>
+        <td><button data-key="${esc(k)}" onclick="openTemplateForm(this.dataset.key)" style="font-size:11px;padding:3px 8px;">編集</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+function openTemplateForm(key){
+  editingTemplateKey = key || null;
+  if(editingTemplateKey){
+    const tpl = getTemplate(editingTemplateKey); if(!tpl) return;
+    document.getElementById('templateModalTitle').textContent = '書類ひな形を編集';
+    document.getElementById('tpl_btnDelete').style.display = 'inline-block';
+    tpl_key.value = editingTemplateKey;
+    tpl_key.readOnly = true;
+    tpl_label.value = tpl.label || '';
+    tpl_rate.value = tpl.rate || '';
+    tpl_apply_apply.value = (tpl.apply_apply || []).join('\n');
+    tpl_apply_plan.value = (tpl.apply_plan || []).join('\n');
+    tpl_apply_bonus.value = (tpl.apply_bonus || []).join('\n');
+  } else {
+    document.getElementById('templateModalTitle').textContent = '新規書類ひな形';
+    document.getElementById('tpl_btnDelete').style.display = 'none';
+    ['tpl_key','tpl_label','tpl_rate','tpl_apply_apply','tpl_apply_plan','tpl_apply_bonus'].forEach(k=>document.getElementById(k).value='');
+    tpl_key.readOnly = false;
+  }
+  document.getElementById('templateModal').classList.add('show');
+}
+function saveTemplate(){
+  const key = tpl_key.value.trim();
+  const label = tpl_label.value.trim();
+  if(!key){ alert('ひな形名は必須です'); return; }
+  if(!label){ alert('表示名は必須です'); return; }
+  if(/[<>"'`\\]/.test(key) || key.length > 40){ alert('ひな形名に使えない文字が含まれています'); return; }
+  const templates = getTemplates();
+  if(!editingTemplateKey && templates[key]){ alert('同じひな形名が既にあります'); return; }
+  const targetKey = editingTemplateKey || key;
+  templates[targetKey] = {
+    label,
+    rate: parseFloat(tpl_rate.value) || 0,
+    apply_apply: linesToList(tpl_apply_apply.value).map(x=>textVal(x, 160)),
+    apply_plan: linesToList(tpl_apply_plan.value).map(x=>textVal(x, 160)),
+    apply_bonus: linesToList(tpl_apply_bonus.value).map(x=>textVal(x, 160))
+  };
+  save();
+  closeModal('templateModal');
+  renderTemplates();
+  refreshCaseTemplateSelect();
+}
+function deleteTemplate(){
+  if(!editingTemplateKey) return;
+  const used = store.cases.filter(c=>c.template===editingTemplateKey).length;
+  const msg = used
+    ? `この書類ひな形を使っている案件が${used}件あります。削除すると該当案件のひな形選択と書類チェックが解除されます。削除しますか？`
+    : 'この書類ひな形を削除しますか？';
+  if(!confirm(msg)) return;
+  if(used){
+    store.cases.forEach(c=>{
+      if(c.template===editingTemplateKey){ c.template=''; c.docs={}; }
+    });
+  }
+  delete getTemplates()[editingTemplateKey];
+  save();
+  closeModal('templateModal');
+  renderTemplates();
+  renderPipeline();
+}
+function moveTemplate(key, dir){
+  const entries = templateEntries(false);
+  const i = entries.findIndex(([k])=>k===key);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=entries.length) return;
+  [entries[i], entries[j]] = [entries[j], entries[i]];
+  const next = { "": getTemplate("") };
+  entries.forEach(([k,v])=>next[k]=v);
+  store.templates = next;
+  save();
+  renderTemplates();
+  refreshCaseTemplateSelect();
+}
+function resetTemplatesToDefault(){
+  if(!confirm('書類ひな形を初期状態に戻しますか？案件データは残ります')) return;
+  store.templates = cloneTemplates();
+  normalizeStore();
+  save();
+  renderTemplates();
+  refreshCaseTemplateSelect();
+}
+function refreshCaseTemplateSelect(){
+  const tplSel = document.getElementById('ca_template');
+  if(!tplSel) return;
+  const current = tplSel.value;
+  tplSel.innerHTML = templateEntries(true).map(([k,v])=>`<option value="${esc(k)}">${esc(v.label)}</option>`).join('');
+  tplSel.value = getTemplates()[current] ? current : '';
+}
+
+// =====================================================
+// CASES
+// =====================================================
+function buildDocsByTemplate(tplKey, checkedDocs){
+  const tpl = getTemplate(tplKey);
+  const sections = [
+    { key:'apply', title:'📑 申請必須書類', docs: tpl.apply_apply || [] },
+    { key:'plan',  title:'📊 計画書作成資料', docs: tpl.apply_plan || [] },
+    { key:'bonus', title:'⭐ 加点書類（任意）', docs: tpl.apply_bonus || [] }
+  ];
+  let html = '';
+  sections.forEach(sec=>{
+    if(sec.docs.length===0) return;
+    html += `<div class="docs-cat"><div class="cat-title">${sec.title}</div><div class="docs-list">`;
+    sec.docs.forEach((d,i)=>{
+      const id = `doc_${sec.key}_${i}`;
+      const checked = checkedDocs && checkedDocs[`${sec.key}_${i}`] ? 'checked' : '';
+      html += `<label><input type="checkbox" id="${id}" ${checked}> ${esc(d)}</label>`;
+    });
+    html += `</div></div>`;
+  });
+  if(!html) html = '<div style="font-size:11px;color:#6b7a6b;padding:8px;">補助金の書類ひな形を選択すると必要書類が表示されます</div>';
+  document.getElementById('docsContainer').innerHTML = html;
+}
+function collectDocs(tplKey){
+  const tpl = getTemplate(tplKey);
+  const result = {};
+  ['apply','plan','bonus'].forEach(cat=>{
+    const list = tpl['apply_'+cat] || [];
+    list.forEach((d,i)=>{
+      const el = document.getElementById(`doc_${cat}_${i}`);
+      if(el) result[`${cat}_${i}`] = el.checked;
+    });
+  });
+  return result;
+}
+function applyTemplate(){
+  const k = document.getElementById('ca_template').value;
+  const tpl = getTemplate(k);
+  if(tpl && tpl.rate) document.getElementById('ca_subrate').value = tpl.rate;
+  // Auto-fill subsidy name if empty
+  if(tpl && tpl.label && tpl.label !== '-- 選択 --' && tpl.label !== 'その他/汎用' && !ca_subsidy.value){
+    ca_subsidy.value = tpl.label;
+  }
+  buildDocsByTemplate(k, null);
+}
+function onClientChange(){
+  const c = clientById(ca_client.value);
+  if(c && PLAN_RATE[c.plan]) ca_rate.value = PLAN_RATE[c.plan];
+  updateCalc();
+}
+function fillCaseSelects(){
+  document.getElementById('ca_client').innerHTML = '<option value="">-</option>' + store.clients.map(c=>`<option value="${c.id}">${esc(c.name)} (${c.plan})</option>`).join('');
+  fillStaffSelect(document.getElementById('ca_staff'), null);
+  const stSel = document.getElementById('ca_stage');
+  if(stSel.options.length===0) stSel.innerHTML = STAGES.map(s=>`<option>${s.name}</option>`).join('');
+  refreshCaseTemplateSelect();
+}
+function updateCalc(){
+  const apply = parseFloat(ca_apply.value)||0;
+  const award = parseFloat(ca_award.value)||0;
+  const rate = parseFloat(ca_rate.value)||0;
+  const subRate = parseFloat(ca_subrate.value)||0;
+  ca_self.textContent = (subRate>0 && apply>0) ? fmt(Math.round(apply / (subRate/100) - apply)) : '-';
+  ca_fee.textContent = award>0 ? fmt(Math.round(award*rate/100)) : '-';
+  const refRate = parseFloat(ca_refrate.value)||0;
+  ca_refamt.textContent = award>0 ? fmt(Math.round(award*refRate/100)) : '-';
+}
+function openCaseForm(id){
+  editingCaseId = id||null;
+  fillCaseSelects();
+  if(id){
+    const c = store.cases.find(x=>x.id===id); if(!c) return;
+    document.getElementById('caseModalTitle').textContent = '案件を編集';
+    document.getElementById('ca_btnDelete').style.display = 'inline-block';
+    ca_client.value=c.client_id||'';
+    fillStaffSelect(document.getElementById('ca_staff'), c.staff_id);
+    ca_template.value=c.template||''; ca_subsidy.value=c.subsidy||''; ca_round.value=c.round||'';
+    ca_deadline.value=c.deadline||''; ca_resdate.value=c.res_date||''; ca_apdate.value=c.ap_date||'';
+    ca_subrate.value=c.sub_rate||''; ca_cap.value=c.cap||''; ca_apply.value=c.apply||''; ca_award.value=c.award||'';
+    ca_rate.value=c.rate||PLAN_RATE[clientById(c.client_id)?.plan]||9;
+    ca_retainer.value=c.retainer||'';
+    ca_stage.value=c.stage||STAGES[0].name; ca_sub.value=c.sub_status||''; ca_due.value=c.due||''; ca_action.value=c.action||'';
+    ca_grdate.value=c.gr_date||''; ca_execs.value=c.exec_s||''; ca_exece.value=c.exec_e||''; ca_repdue.value=c.rep_due||'';
+    buildDocsByTemplate(c.template||'', c.docs);
+    ca_docs_custom.value = (c.docs_custom||[]).join(', ');
+    ca_refsrc.value=c.ref_src||''; ca_refrate.value=c.ref_rate||5; ca_refdate.value=c.ref_date||''; ca_refpaid.checked=!!c.ref_paid;
+    ca_memo.value=c.memo||''; ca_kasanten.value=c.kasanten||''; ca_shinsa.value=c.shinsa||'';
+  } else {
+    document.getElementById('caseModalTitle').textContent = '新規案件';
+    document.getElementById('ca_btnDelete').style.display = 'none';
+    ['ca_subsidy','ca_round','ca_deadline','ca_resdate','ca_apdate','ca_cap','ca_apply','ca_award','ca_retainer','ca_due','ca_action','ca_grdate','ca_repdue','ca_execs','ca_exece','ca_docs_custom','ca_refsrc','ca_refdate','ca_memo','ca_kasanten','ca_shinsa'].forEach(k=>document.getElementById(k).value='');
+    ca_template.value=''; ca_subrate.value=''; ca_rate.value=9; ca_refrate.value=5; ca_sub.value=''; ca_refpaid.checked=false;
+    ca_stage.value=STAGES[0].name;
+    buildDocsByTemplate('', null);
+  }
+  updateCalc();
+  document.getElementById('caseModal').classList.add('show');
+}
+function openCaseForClient(clientId){
+  openCaseForm();
+  if(clientId && clientById(clientId)){
+    ca_client.value = clientId;
+    onClientChange();
+  }
+}
+function saveCase(){
+  const client_id = ca_client.value;
+  const subsidy = ca_subsidy.value.trim();
+  if(!client_id){ alert('顧問先を選択してください'); return; }
+  if(!subsidy){ alert('補助金名は必須'); return; }
+  const tplKey = ca_template.value;
+  const docs = collectDocs(tplKey);
+  const docs_custom = ca_docs_custom.value.split(',').map(s=>s.trim()).filter(Boolean);
+  const data = {
+    client_id, staff_id:ca_staff.value, template:tplKey,
+    subsidy, round:ca_round.value.trim(), deadline:ca_deadline.value,
+    sub_rate:parseFloat(ca_subrate.value)||0, cap:parseFloat(ca_cap.value)||0,
+    apply:parseFloat(ca_apply.value)||0, award:parseFloat(ca_award.value)||0,
+    rate:parseFloat(ca_rate.value)||0, retainer:parseFloat(ca_retainer.value)||0,
+    stage:ca_stage.value, sub_status:ca_sub.value, due:ca_due.value, action:ca_action.value.trim(),
+    ap_date:ca_apdate.value, res_date:ca_resdate.value, gr_date:ca_grdate.value, rep_due:ca_repdue.value,
+    exec_s:ca_execs.value, exec_e:ca_exece.value,
+    docs, docs_custom,
+    ref_src:ca_refsrc.value.trim(), ref_rate:parseFloat(ca_refrate.value)||0, ref_date:ca_refdate.value, ref_paid:ca_refpaid.checked,
+    memo:ca_memo.value, kasanten:ca_kasanten.value, shinsa:ca_shinsa.value,
+    updated:new Date().toISOString()
+  };
+  if(editingCaseId) Object.assign(store.cases.find(x=>x.id===editingCaseId), data);
+  else store.cases.push({ id:uid(), created:new Date().toISOString(), ...data });
+  save(); closeModal('caseModal'); renderPipeline(); renderDash(); if(currentClientDetailId) renderClientDetail();
+}
+function deleteCase(){
+  if(!editingCaseId) return;
+  if(!confirm('この案件を削除しますか？')) return;
+  store.cases = store.cases.filter(x=>x.id!==editingCaseId);
+  save(); closeModal('caseModal'); renderPipeline(); renderDash(); if(currentClientDetailId) renderClientDetail();
+}
+
+// =====================================================
+// PIPELINE
+// =====================================================
+function setPipelineView(v){
+  pipelineView = v;
+  document.getElementById('kanban').style.display = v==='kanban'?'flex':'none';
+  document.getElementById('pipelineTable').style.display = v==='table'?'block':'none';
+  document.getElementById('pipelinePager').style.display = v==='table'?'flex':'none';
+  document.getElementById('btnKb').classList.toggle('primary', v==='kanban');
+  document.getElementById('btnTb').classList.toggle('primary', v==='table');
+  renderPipeline();
+}
+function refreshPipelineFilters(){
+  const cs = document.getElementById('pFilterClient');
+  const ss = document.getElementById('pFilterStaff');
+  const cv = cs.value, sv = ss.value;
+  cs.innerHTML = '<option value="">顧問先:全て</option>' + store.clients.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  ss.innerHTML = '<option value="">担当:全て</option>' + store.staff.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  cs.value = cv; ss.value = sv;
+}
+function filteredCases(){
+  const c = document.getElementById('pFilterClient').value;
+  const s = document.getElementById('pFilterStaff').value;
+  const p = document.getElementById('pFilterPhase').value;
+  const q = document.getElementById('pFilterText').value.toLowerCase();
+  return store.cases.filter(x =>
+    (!c || x.client_id===c) &&
+    (!s || x.staff_id===s) &&
+    (!p || getStage(x.stage).phase===p) &&
+    (!q || (x.subsidy||'').toLowerCase().includes(q))
+  );
+}
+function renderPipeline(){
+  refreshPipelineFilters();
+  const list = filteredCases();
+  document.getElementById('pCount').textContent = `${list.length} / ${store.cases.length}件`;
+  if(pipelineView==='kanban'){ renderKanban(list); document.getElementById('pipelinePager').innerHTML=''; }
+  else renderPipelineTable(list);
+}
+function caseCard(c){
+  const cl = clientById(c.client_id);
+  const st = staffById(c.staff_id);
+  return `<div class="case-card" draggable="true" data-id="${c.id}" ondragstart="onDrag(event,'${c.id}')" ondragend="this.classList.remove('dragging')" onclick="openCaseForm('${c.id}')">
+    <div class="title">${esc(cl?.name||'(未割当)')}</div>
+    <div class="meta">
+      <div>${esc(c.subsidy)} ${c.round?'/'+esc(c.round):''}</div>
+      <div><span class="plan-tag plan-${cl?.plan||'未契約'}">${cl?.plan||'未契約'}</span>${c.apply?'申'+fmt(c.apply)+'万':''}${c.award?' 採'+fmt(c.award)+'万':''}</div>
+      ${st?`<div>👤 ${esc(st.name)}</div>`:''}
+      ${c.action?`<div>→ ${esc(c.action)}</div>`:''}
+      ${c.due?`<div><span class="due-tag ${dueClass(c.due)}">期日: ${c.due}</span></div>`:''}
+    </div>
+  </div>`;
+}
+function renderKanban(list){
+  const el = document.getElementById('kanban');
+  el.innerHTML = STAGES.map(s=>{
+    const items = list.filter(c=>c.stage===s.name);
+    return `<div class="col ${s.pc}" data-stage="${s.name}" ondragover="event.preventDefault();this.classList.add('dropping')" ondragleave="this.classList.remove('dropping')" ondrop="onDrop(event,'${s.name}')">
+      <h4 class="${s.pc}">${s.name}<span class="count">${items.length}</span></h4>
+      <div class="cards">${items.map(caseCard).join('')}</div>
+    </div>`;
+  }).join('');
+}
+function renderPipelineTable(list){
+  const el = document.getElementById('pipelineTable');
+  if(list.length===0){ el.innerHTML = '<div class="empty">案件がありません</div>'; document.getElementById('pipelinePager').innerHTML=''; return; }
+  const start = (page.pipeline-1)*PAGE_SIZE;
+  const pageList = list.slice(start, start+PAGE_SIZE);
+  el.innerHTML = `<table>
+    <thead><tr><th>顧問先</th><th>補助金</th><th>担当</th><th>進み具合</th><th class="num">申請(万)</th><th class="num">採択(万)</th><th class="num">報酬(万)</th><th>期日</th><th></th></tr></thead>
+    <tbody>${pageList.map(c=>{
+      const cl=clientById(c.client_id); const st=staffById(c.staff_id); const s=getStage(c.stage);
+      return `<tr class="${dueClass(c.due)==='due-over'?'alert-row':dueClass(c.due)==='due-soon'?'warn-row':''}">
+        <td><b>${esc(cl?.name||'-')}</b><br><span class="plan-tag plan-${cl?.plan||'未契約'}">${cl?.plan||'未契約'}</span></td>
+        <td>${esc(c.subsidy)}<br><span style="font-size:10px;color:#6b7a6b">${esc(c.round||'')}</span></td>
+        <td>${esc(st?.name||'-')}</td>
+        <td><span class="plan-tag ${s.pc}">${s.phase}</span><br>${esc(c.stage)}</td>
+        <td class="num">${fmt(c.apply)}</td><td class="num">${fmt(c.award)}</td>
+        <td class="num">${fmt(Math.round((c.award||0)*(c.rate||0)/100))}</td>
+        <td style="font-size:11px">${c.due||'-'}</td>
+        <td><button onclick="openCaseForm('${c.id}')" style="font-size:11px;padding:3px 8px;">編集</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+  renderPager('pipelinePager', list.length, page.pipeline, 'gotoPipelinePage');
+}
+function onDrag(e,id){ e.dataTransfer.setData('text/plain', id); e.target.classList.add('dragging'); }
+function onDrop(e, stage){
+  e.preventDefault();
+  document.querySelectorAll('.col.dropping').forEach(el=>el.classList.remove('dropping'));
+  const id = e.dataTransfer.getData('text/plain');
+  const c = store.cases.find(x=>x.id===id);
+  if(c){ c.stage = stage; c.updated = new Date().toISOString(); save(); renderPipeline(); renderDash(); }
+}
+
+// =====================================================
+// DASHBOARD (with 12-month forecast hero)
+// =====================================================
+function renderDash(){
+  const cases = store.cases;
+  const clients = store.clients;
+  const ADOPTION_ASSUMPTION = 0.5; // 想定採択率 50%
+
+  const monthlyFee = clients.reduce((s,c)=>s+(PLAN_FEE[c.plan]||0), 0);
+  const avgMonthlyFee = clients.length ? Math.round(monthlyFee/clients.length) : 0;
+
+  // 確定報酬未収（採択以降で未入金）
+  const confirmedFee = cases.filter(c=>['採択','交付決定・事業実施中','実績報告中'].includes(c.stage))
+    .reduce((s,c)=>s+successFeeMan(c), 0) * 10000;
+  // 見込報酬（申請中・準備中×想定採択率）
+  const pipelineFee = cases.filter(c=>['計画策定中','書類・申請書作成','申請済・審査中'].includes(c.stage))
+    .reduce((s,c)=>s+((c.award||c.apply||0)*(c.rate||0)/100), 0) * 10000 * ADOPTION_ASSUMPTION;
+
+  const annual = monthlyFee * 12;
+  const forecast = annual + confirmedFee + pipelineFee;
+
+  document.getElementById('hero').innerHTML = `
+    <div class="main">
+      <div class="label">今後12か月の売上見込み</div>
+      <div class="value">¥${fmt(Math.round(forecast))}</div>
+      <div class="sub">月額顧問料の12か月分 ＋ 採択済みで未回収の報酬 ＋ 申請中案件の見込み報酬（採択見込み${Math.round(ADOPTION_ASSUMPTION*100)}%）</div>
+    </div>
+    <div class="breakdown">
+      <div class="item"><div class="l">月額顧問料 12か月分</div><div class="v">¥${fmt(annual)}</div></div>
+      <div class="item"><div class="l">採択済み 未回収報酬</div><div class="v">¥${fmt(Math.round(confirmedFee))}</div></div>
+      <div class="item"><div class="l">申請中の見込み報酬</div><div class="v">¥${fmt(Math.round(pipelineFee))}</div></div>
+      <div class="item"><div class="l">月額顧問料</div><div class="v">¥${fmt(monthlyFee)}</div></div>
+    </div>
+  `;
+
+  const planCount = {}; PLANS.forEach(p=>planCount[p]=0);
+  clients.forEach(c=>{ planCount[c.plan||'未契約']++; });
+
+  const phaseStats = {}; PHASES.forEach(p=>phaseStats[p]={n:0, apply:0, award:0});
+  cases.forEach(c=>{ const ph = getStage(c.stage).phase; phaseStats[ph].n++; phaseStats[ph].apply += c.apply||0; phaseStats[ph].award += c.award||0; });
+
+  const decided = cases.filter(c=>DECIDED_STAGES.includes(c.stage));
+  const won = cases.filter(c=>isWonStage(c.stage));
+  const adoptionRate = decided.length ? Math.round(won.length*100/decided.length) : 0;
+
+  const cancelling = clients.filter(c=>c.notice && diffDays(c.notice)!=null);
+  const lossMonthlyFee = cancelling.reduce((s,c)=>s+(PLAN_FEE[c.plan]||0), 0);
+
+  const dueOver = cases.filter(c=>c.due && diffDays(c.due)<0 && c.stage!=='入金完了');
+  const dueSoon = cases.filter(c=>c.due && diffDays(c.due)>=0 && diffDays(c.due)<=7 && c.stage!=='入金完了');
+  const unpaidRefs = cases.filter(isReferralDue);
+  const unpaidRefTotal = unpaidRefs.reduce((s,c)=>s+referralFeeMan(c),0);
+  const chatMonth = currentMonth();
+  const chatOver = clients.map(c=>{
+    const limit = chatLimit(c);
+    const count = chatUsage(c.id, chatMonth);
+    return { c, limit, count, excess: limit ? Math.max(0, count-limit) : 0 };
+  }).filter(x=>x.excess>0);
+  const chatOverFee = chatOver.reduce((s,x)=>s+x.excess*CHAT_OVERAGE_FEE,0);
+
+  document.getElementById('stat-main').innerHTML = `
+    <div class="stat"><div class="label">月額顧問料</div><div class="value">¥${fmt(monthlyFee)}</div><div class="sub">${clients.length}社 / 1社あたり平均 ¥${fmt(avgMonthlyFee)}</div></div>
+    <div class="stat"><div class="label">進行中案件</div><div class="value">${cases.filter(c=>c.stage!=='入金完了').length}</div><div class="sub">総${cases.length}件 / 採択${won.length}</div></div>
+    <div class="stat"><div class="label">採択率</div><div class="value">${adoptionRate}%</div><div class="sub">確定${decided.length}件中</div></div>
+    <div class="stat ${dueOver.length?'alert':''}"><div class="label">期日超過</div><div class="value">${dueOver.length}</div><div class="sub">即対応</div></div>
+    <div class="stat ${dueSoon.length?'warn':''}"><div class="label">7日以内</div><div class="value">${dueSoon.length}</div><div class="sub">要確認</div></div>
+    <div class="stat ${cancelling.length?'warn':''}"><div class="label">解約予告</div><div class="value">${cancelling.length}</div><div class="sub">減少見込み月額 ¥${fmt(lossMonthlyFee)}</div></div>
+    <div class="stat ${unpaidRefs.length?'warn':''}"><div class="label">紹介報酬 未払い</div><div class="value">${unpaidRefs.length}</div><div class="sub">${fmt(Math.round(unpaidRefTotal))}万円</div></div>
+    <div class="stat ${chatOver.length?'warn':''}"><div class="label">相談超過</div><div class="value">${chatOver.length}</div><div class="sub">追加請求 ¥${fmt(chatOverFee)}</div></div>
+  `;
+
+  const maxPlan = Math.max(1, ...Object.values(planCount));
+  document.getElementById('plan-breakdown').innerHTML = PLANS.map(p=>`
+    <div class="bar-row">
+      <div class="name"><span class="plan-tag plan-${p}">${p}</span></div>
+      <div class="bar"><span style="width:${planCount[p]/maxPlan*100}%"></span></div>
+      <div class="val">${planCount[p]}社 / ¥${fmt(planCount[p]*(PLAN_FEE[p]||0))}</div>
+    </div>`).join('');
+
+  const maxPhase = Math.max(1, ...PHASES.map(p=>phaseStats[p].n));
+  document.getElementById('phase-breakdown').innerHTML = PHASES.map(p=>{
+    const s = phaseStats[p];
+    return `<div class="bar-row">
+      <div class="name">${p}</div>
+      <div class="bar"><span style="width:${s.n/maxPhase*100}%"></span></div>
+      <div class="val">${s.n}件 / 申${fmt(s.apply)}万</div>
+    </div>`;
+  }).join('');
+
+  const alerts = [...dueOver.map(c=>({c,t:'超過',d:diffDays(c.due)})), ...dueSoon.map(c=>({c,t:'近接',d:diffDays(c.due)}))].sort((a,b)=>a.d-b.d);
+  document.getElementById('alert-list').innerHTML = alerts.length ? `<table>
+    <thead><tr><th>状態</th><th>期日</th><th>顧問先</th><th>補助金</th><th>進み具合</th><th>次アクション</th><th></th></tr></thead>
+    <tbody>${alerts.map(({c,t,d})=>{
+      const cl=clientById(c.client_id);
+      return `<tr class="${t==='超過'?'alert-row':'warn-row'}">
+        <td><b>${t}</b><br><span style="font-size:10px">${d<0?Math.abs(d)+'日経過':'あと'+d+'日'}</span></td>
+        <td style="font-size:11px">${c.due}</td>
+        <td>${esc(cl?.name||'-')}</td><td>${esc(c.subsidy)}</td><td>${esc(c.stage)}</td>
+        <td style="font-size:11px">${esc(c.action||'-')}</td>
+        <td><button onclick="openCaseForm('${c.id}')" style="font-size:11px;padding:3px 8px;">開く</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>` : '<div style="font-size:12px;color:#6b7a6b;">期日のお知らせはありません。すべて余裕あり。</div>';
+
+  document.getElementById('referral-alert-list').innerHTML = unpaidRefs.length ? `<table>
+    <thead><tr><th>紹介元</th><th>顧問先</th><th>補助金</th><th class="num">採択額</th><th class="num">紹介率</th><th class="num">未払い額</th><th>支払予定</th><th></th></tr></thead>
+    <tbody>${unpaidRefs.map(c=>{
+      const cl = clientById(c.client_id);
+      return `<tr class="warn-row">
+        <td><b>${esc(c.ref_src)}</b></td>
+        <td>${esc(cl?.name||'-')}</td>
+        <td>${esc(c.subsidy)}</td>
+        <td class="num">${fmt(c.award)}万</td>
+        <td class="num">${fmt(c.ref_rate)}%</td>
+        <td class="num">${fmt(Math.round(referralFeeMan(c)))}万</td>
+        <td>${c.ref_date||'-'}</td>
+        <td><div class="inline-actions"><button onclick="openCaseForm('${attr(c.id)}')">開く</button><button onclick="markReferralPaid('${attr(c.id)}')">支払済</button></div></td>
+      </tr>`;
+    }).join('')}</tbody></table>
+    <div style="font-size:11px;color:#6b7a6b;margin-top:8px;">紹介元別: ${Object.entries(referralSummary(unpaidRefs)).map(([src,amt])=>`${esc(src)} ${fmt(Math.round(amt))}万`).join(' / ')}</div>` : '<div style="font-size:12px;color:#6b7a6b;">紹介報酬の未払いはありません。</div>';
+
+  document.getElementById('chat-alert-list').innerHTML = chatOver.length ? `<table>
+    <thead><tr><th>顧問先</th><th>プラン</th><th class="num">当月件数</th><th>上限</th><th class="num">超過</th><th class="num">超過料金</th><th></th></tr></thead>
+    <tbody>${chatOver.map(({c,limit,count,excess})=>`<tr class="warn-row">
+      <td><b>${esc(c.name)}</b></td>
+      <td><span class="plan-tag plan-${c.plan}">${esc(c.plan)}</span></td>
+      <td class="num">${count}</td>
+      <td>${limit}件/月</td>
+      <td class="num">${excess}件</td>
+      <td class="num">¥${fmt(excess*CHAT_OVERAGE_FEE)}</td>
+      <td><div class="inline-actions"><button onclick="openChatForm(null,'${attr(c.id)}')">記録</button><button onclick="openClientDetail('${attr(c.id)}')">詳細</button></div></td>
+    </tr>`).join('')}</tbody></table>` : '<div style="font-size:12px;color:#6b7a6b;">ミニプランの相談件数超過はありません。</div>';
+
+  document.getElementById('cancel-list').innerHTML = cancelling.length ? `<table>
+    <thead><tr><th>顧問先</th><th>プラン</th><th>解約予告日</th><th>残日数</th><th>月額損失</th><th></th></tr></thead>
+    <tbody>${cancelling.map(c=>`<tr>
+      <td>${esc(c.name)}</td><td><span class="plan-tag plan-${c.plan}">${c.plan}</span></td>
+      <td>${c.notice}</td><td>${diffDays(c.notice)}日</td>
+      <td>¥${fmt(PLAN_FEE[c.plan]||0)}</td>
+      <td><button onclick="openClientForm('${c.id}')" style="font-size:11px;padding:3px 8px;">開く</button></td>
+    </tr>`).join('')}</tbody></table>` : '<div style="font-size:12px;color:#6b7a6b;">解約予告なし。</div>';
+}
+function markReferralPaid(id){
+  const c = store.cases.find(x=>x.id===id);
+  if(!c) return;
+  if(!confirm('この紹介報酬を支払済みにしますか？')) return;
+  c.ref_paid = true;
+  c.updated = new Date().toISOString();
+  save();
+  renderDash();
+  renderPipeline();
+  if(currentClientDetailId) renderClientDetail();
+}
+
+// =====================================================
+// CALENDAR
+// =====================================================
+function calMove(delta){
+  if(delta===0) calCursor = new Date(); else calCursor.setMonth(calCursor.getMonth()+delta);
+  calCursor.setDate(1);
+  renderCalendar();
+}
+function renderCalendar(){
+  const y = calCursor.getFullYear(), m = calCursor.getMonth();
+  document.getElementById('calTitle').textContent = `${y}年 ${m+1}月`;
+  const first = new Date(y, m, 1);
+  const firstDow = first.getDay();
+  const last = new Date(y, m+1, 0).getDate();
+  const prevLast = new Date(y, m, 0).getDate();
+  const cells = [];
+  for(let i=firstDow-1;i>=0;i--) cells.push({ d: new Date(y, m-1, prevLast-i), other:true });
+  for(let d=1; d<=last; d++) cells.push({ d: new Date(y, m, d), other:false });
+  while(cells.length < 42) cells.push({ d: new Date(y, m+1, cells.length - firstDow - last + 1), other:true });
+
+  // Events index by date string
+  const events = {};
+  store.cases.forEach(c=>{
+    const cl = clientById(c.client_id);
+    const cname = cl?.name || '(未割当)';
+    if(c.deadline) (events[c.deadline]=events[c.deadline]||[]).push({type:'deadline', label:`📌 公募締切: ${cname} / ${c.subsidy}`, cid:c.id});
+    if(c.due) (events[c.due]=events[c.due]||[]).push({type:'due', label:`⏰ ${cname}: ${c.action||c.stage}`, cid:c.id});
+    if(c.res_date) (events[c.res_date]=events[c.res_date]||[]).push({type:'', label:`🎯 採択発表: ${cname}`, cid:c.id});
+  });
+  store.clients.forEach(c=>{
+    if(c.notice) (events[c.notice]=events[c.notice]||[]).push({type:'contract', label:`📋 解約予告期限: ${c.name}`, clid:c.id});
+  });
+
+  const todayStr = new Date().toISOString().slice(0,10);
+  const dows = ['日','月','火','水','木','金','土'];
+  let html = dows.map(d=>`<div class="dow">${d}</div>`).join('');
+  cells.forEach(c=>{
+    const ds = c.d.toISOString().slice(0,10);
+    const evs = events[ds] || [];
+    html += `<div class="cal-cell ${c.other?'other':''} ${ds===todayStr?'today':''}">
+      <div class="date">${c.d.getDate()}</div>
+      ${evs.map(e=>`<div class="cal-event ${e.type}" onclick="${e.cid?`openCaseForm('${e.cid}')`:`openClientForm('${e.clid}')`}" title="${esc(e.label)}">${esc(e.label.slice(0,30))}</div>`).join('')}
+    </div>`;
+  });
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+// =====================================================
+// MONTHLY REPORT
+// =====================================================
+function initReport(){
+  const sel = document.getElementById('rpClient');
+  sel.innerHTML = '<option value="">-- 顧問先を選択 --</option>' + store.clients.map(c=>`<option value="${c.id}">${esc(c.name)} (${c.plan})</option>`).join('');
+  if(!document.getElementById('rpMonth').value){
+    const t = new Date();
+    document.getElementById('rpMonth').value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`;
+  }
+}
+function generateReport(){
+  const cid = document.getElementById('rpClient').value;
+  const monthStr = document.getElementById('rpMonth').value;
+  if(!cid){ alert('顧問先を選択してください'); return; }
+  if(!monthStr){ alert('対象月を選択してください'); return; }
+  const cl = clientById(cid); if(!cl) return;
+
+  const [yy, mm] = monthStr.split('-').map(Number);
+  const monthStart = new Date(yy, mm-1, 1);
+  const monthEnd = new Date(yy, mm, 0);
+  const monthEndStr = monthEnd.toISOString().slice(0,10);
+
+  const cases = store.cases.filter(c=>c.client_id===cid);
+  const active = cases.filter(c=>c.stage!=='入金完了');
+  const wonThisMonth = cases.filter(c=>c.res_date && c.res_date>=monthStr+'-01' && c.res_date<=monthEndStr && ['採択','交付決定・事業実施中','実績報告中','入金完了'].includes(c.stage));
+  const submittedThisMonth = cases.filter(c=>c.ap_date && c.ap_date>=monthStr+'-01' && c.ap_date<=monthEndStr);
+  const curation = document.getElementById('rpCuration').value.trim();
+  const staff = staffById(cl.staff_id);
+
+  const html = `
+    <h1>月次レポート</h1>
+    <div class="sub-h">${yy}年${mm}月度 / 発行日 ${new Date().toLocaleDateString('ja-JP')}</div>
+
+    <div class="biz-card">
+      <b>${esc(cl.name)}</b> 御中<br>
+      <span style="color:#6b7a6b">${esc(cl.contact||'')} 様 ${cl.email?'/ '+esc(cl.email):''}</span>
+    </div>
+
+    <h2>1. ご契約内容</h2>
+    <table>
+      <tr><th style="width:30%">プラン</th><td><span class="plan-tag plan-${cl.plan}">${cl.plan}</span> 月額 ¥${fmt(PLAN_FEE[cl.plan]||0)}（税抜）</td></tr>
+      <tr><th>契約開始日</th><td>${cl.start||'-'}</td></tr>
+      <tr><th>担当顧問</th><td>${esc(staff?.name||'-')} ${staff?.role?'('+esc(staff.role)+')':''}</td></tr>
+    </table>
+
+    <h2>2. 今月の進捗ハイライト</h2>
+    ${wonThisMonth.length>0 ? `
+      <p style="background:#c9e2d2;padding:8px;border-radius:4px;">🎉 <b>今月採択された案件 ${wonThisMonth.length}件</b></p>
+      <ul>${wonThisMonth.map(c=>`<li>${esc(c.subsidy)} ${esc(c.round)} - 採択額 ${fmt(c.award)}万円</li>`).join('')}</ul>
+    `:''}
+    ${submittedThisMonth.length>0 ? `<p>📤 今月申請完了: ${submittedThisMonth.length}件 (${submittedThisMonth.map(c=>esc(c.subsidy)).join(', ')})</p>`:''}
+    ${wonThisMonth.length===0 && submittedThisMonth.length===0 ? '<p style="color:#6b7a6b">今月の採択・申請完了はありません</p>':''}
+
+    <h2>3. 進行中案件一覧（${active.length}件）</h2>
+    ${active.length>0 ? `<table>
+      <thead><tr><th>補助金名</th><th>進み具合</th><th>申請額</th><th>次アクション</th><th>期日</th></tr></thead>
+      <tbody>${active.map(c=>`<tr>
+        <td>${esc(c.subsidy)}<br><span style="font-size:9px;color:#6b7a6b">${esc(c.round||'')}</span></td>
+        <td>${esc(c.stage)}</td>
+        <td>${c.apply?fmt(c.apply)+'万':'-'}</td>
+        <td>${esc(c.action||'-')}</td>
+        <td>${c.due||'-'}</td>
+      </tr>`).join('')}</tbody>
+    </table>` : '<p style="color:#6b7a6b">現在進行中の案件はありません</p>'}
+
+    ${curation ? `<h2>4. 今月のおすすめ補助金情報</h2><div style="white-space:pre-wrap;padding:10px;background:#f5f8f5;border-left:3px solid #2d5a3d;">${esc(curation)}</div>`:''}
+
+    <h2>${curation?'5':'4'}. 来月のご予定</h2>
+    <ul>
+      ${cl.plan==='スタンダード'||cl.plan==='プレミアム'?'<li>月次ZOOM/訪問MTGの日程調整をお願いします</li>':''}
+      <li>新規申請をご検討の場合はチャットでお気軽にご相談ください</li>
+    </ul>
+
+    <div class="footer">
+      <b>GREEN PARTNERSHIP</b> | 補助金顧問サービス<br>
+      Email: Green-PartnerShip@outlook.jp<br>
+      Continue to grow + Sustainable value
+    </div>
+  `;
+  document.getElementById('reportOutput').innerHTML = html;
+  document.getElementById('reportOutput').style.display = 'block';
+  document.getElementById('rpPrintBtn').style.display = 'inline-block';
+}
+
+// =====================================================
+// MODALS
+// =====================================================
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('show'); }));
+const GP_APP_ROUTE = '/internal/gp';
+function openAppSwitch(){ document.getElementById('appSwitchModal').classList.add('show'); }
+function goToGpApp(newWindow=false){
+  const url = location.origin + GP_APP_ROUTE;
+  if(newWindow){
+    const w = window.open(url, 'gpBusinessManagement', 'width=1280,height=860,noopener');
+    if(!w) location.href = url;
+    return;
+  }
+  location.href = url;
+}
+async function copyAppSwitchUrl(){
+  const url = location.origin + '/app-switch';
+  try {
+    await navigator.clipboard.writeText(url);
+    alert('切替URLをコピーしました。');
+  } catch(e) {
+    prompt('このURLをコピーしてください。', url);
+  }
+}
+function openHelp(){ document.getElementById('helpModal').classList.add('show'); }
+
+// =====================================================
+// BUTTON HELP TOOLTIPS
+// =====================================================
+let helpTooltipTimer = null;
+let helpTooltipTarget = null;
+let helpTooltipEl = null;
+function helpTextForButton(btn){
+  if(!btn) return '';
+  if(btn.dataset && btn.dataset.help) return btn.dataset.help;
+  const text = (btn.textContent || '').replace(/\s+/g,' ').trim();
+  const onclick = btn.getAttribute('onclick') || '';
+  const rules = [
+    ["switchTab('dash')", 'トップ画面を開きます。売上見込み、期日、紹介報酬、相談件数の超過など、今日確認すべき状況をまとめて見ます。'],
+    ["switchTab('clients')", '顧問先一覧を開きます。顧問先の登録、契約プラン、担当者、案件数、当月相談件数を確認できます。'],
+    ["switchTab('chats')", 'チャット相談管理を開きます。相談件数を月別に集計し、ミニプランの月10件超過を確認できます。'],
+    ["switchTab('staff')", '担当者一覧を開きます。社内担当者を登録し、顧問先や案件へ割り当てます。'],
+    ["switchTab('pipeline')", '案件進捗を開きます。補助金申請案件の進み具合、金額、次にやることを管理します。'],
+    ["switchTab('templates')", '書類ひな形画面を開きます。補助金ごとの必要書類チェックリストを編集できます。'],
+    ["switchTab('calendar')", 'カレンダーを開きます。締切、次アクション、採択発表、解約予告を月単位で確認します。'],
+    ["switchTab('report')", '月次レポート画面を開きます。顧問先ごとの報告書を作成し、PDF（保存用の書類ファイル）にできます。'],
+    ['openAppSwitch', 'アプリ切替ウィンドウを開きます。別画面からGP業務管理へ戻る入口として使います。'],
+    ['goToGpApp', 'GP業務管理を開きます。別ウィンドウで開くボタンでは、新しいブラウザウィンドウにGP業務管理を表示します。'],
+    ['copyAppSwitchUrl', '他の画面に置くための切替URLをコピーします。'],
+    ['reloadSavedData', '社内共有データの最新内容を呼び出し、画面を保存済み状態へ戻します。未保存の入力中内容は破棄されます。'],
+    ['exportAll', '全データを復元用の控えファイルとして保存します。定期的な控え保存やパソコン移行前に使います。'],
+    ['importFile', '控え保存したファイルを選択して読み込みます。現在の保存データを置き換える操作です。'],
+    ['loadSample', '操作練習用のデータを追加します。本番データに混ぜたくない場合は事前に控え保存してください。'],
+    ['clearWorkingState', '保存済みデータは消さず、入力中フォーム・検索条件・一時表示だけをクリアします。作業画面を整えたいときに使います。'],
+    ['openClientForm', '顧問先フォームを開きます。企業情報、契約プラン、担当者、解約予告日などを登録・編集できます。'],
+    ['openClientDetail', '顧問先詳細を開きます。採択履歴、案件履歴、累計金額、相談履歴を確認できます。'],
+    ['openStaffForm', '担当者フォームを開きます。社内担当者の氏名、役割、メール、メモを登録・編集します。'],
+    ['openCaseForm', '案件フォームを開きます。補助金名、締切、申請額、進み具合、必要書類、紹介報酬を管理します。'],
+    ['openCaseForClient', 'この顧問先に紐づけて新しい案件を追加します。'],
+    ['openChatForm', 'チャット相談を記録します。相談日、対応者、件数、内容メモを保存します。'],
+    ["setPipelineView('kanban')", 'カード表示に切り替えます。案件カードを動かして進み具合を変更できます。'],
+    ["setPipelineView('table')", '一覧表示に切り替えます。案件の金額、期日、進み具合を表で確認できます。'],
+    ['openTemplateForm', '書類ひな形フォームを開きます。補助金ごとの必要書類リストを追加・編集できます。'],
+    ['resetTemplatesToDefault', '書類ひな形を初期状態へ戻します。独自編集したひな形は上書きされます。'],
+    ['moveTemplate', '書類ひな形の表示順を上下に移動します。案件フォームの選択順にも反映されます。'],
+    ['calMove(-1)', 'カレンダーを前月へ移動します。'],
+    ['calMove(1)', 'カレンダーを翌月へ移動します。'],
+    ['calMove(0)', 'カレンダーを今月へ戻します。'],
+    ['generateReport', '選択した顧問先と月で、月次レポートを生成します。'],
+    ['window.print', '作成した月次レポートを印刷します。保存先でPDF（保存用の書類ファイル）を選べます。'],
+    ['saveClient', '顧問先情報を保存します。企業名、契約情報、担当者などが保存されます。'],
+    ['deleteClient', '顧問先を削除します。関連案件がある場合は確認が表示されます。'],
+    ['saveStaff', '担当者情報を保存します。'],
+    ['deleteStaff', '担当者を削除します。関連する顧問先・案件の担当は未割当に戻ります。'],
+    ['saveCase', '案件情報を保存します。金額、進み具合、必要書類、紹介管理も保存されます。'],
+    ['deleteCase', '案件を削除します。削除後は元に戻せないため、必要なら事前に控え保存してください。'],
+    ['saveTemplate', '書類ひな形を保存します。案件フォームの必要書類チェックに反映されます。'],
+    ['deleteTemplate', '書類ひな形を削除します。利用中案件のひな形選択と書類チェックは解除されます。'],
+    ['saveChat', 'チャット相談記録を保存します。当月件数と超過料金の集計に反映されます。'],
+    ['deleteChat', 'チャット相談記録を削除します。集計件数も減ります。'],
+    ['markReferralPaid', 'この案件の紹介報酬を支払済みにします。トップ画面の未払いのお知らせから消えます。'],
+    ['closeModal', 'フォームやヘルプを閉じます。保存ボタンを押していない入力内容は保存されません。'],
+  ];
+  const hit = rules.find(([needle])=>onclick.includes(needle));
+  if(hit) return hit[1];
+  if(text === '保存') return '入力内容を保存します。保存後、一覧やトップ画面へ反映されます。';
+  if(text === 'キャンセル') return '保存せずにフォームを閉じます。入力中の内容は反映されません。';
+  if(text === '削除') return 'このデータを削除します。必要な場合は先に控え保存してください。';
+  if(text === '編集') return '選択したデータの編集フォームを開きます。';
+  if(text === '開く') return '該当する案件または顧問先の詳細を開きます。';
+  if(text === '詳細') return '顧問先の詳細画面を開き、採択履歴や相談履歴を確認します。';
+  if(text === '記録') return 'この顧問先のチャット相談を記録します。';
+  if(text === '支払済') return '紹介報酬を支払済みに変更します。';
+  if(['↑','↓'].includes(text)) return '表示順を入れ替えます。';
+  if(['«','‹','›','»'].includes(text) || /^\d+$/.test(text)) return 'ページを移動します。一覧件数が多いときに使います。';
+  if(text) return `${text} を実行します。詳しい用途は右上の「?」ヘルプで確認できます。`;
+  return '';
+}
+function ensureTooltip(){
+  if(helpTooltipEl) return helpTooltipEl;
+  helpTooltipEl = document.createElement('div');
+  helpTooltipEl.className = 'gp-tooltip';
+  document.body.appendChild(helpTooltipEl);
+  return helpTooltipEl;
+}
+function showButtonTooltip(btn){
+  const body = helpTextForButton(btn);
+  if(!body) return;
+  const tip = ensureTooltip();
+  const title = (btn.textContent || btn.getAttribute('aria-label') || '操作').replace(/\s+/g,' ').trim();
+  tip.innerHTML = `<div class="tt-title">${esc(title || '操作')}</div><div>${esc(body)}</div>`;
+  const r = btn.getBoundingClientRect();
+  const margin = 10;
+  let left = r.left;
+  let top = r.bottom + margin;
+  tip.style.left = '0px';
+  tip.style.top = '0px';
+  tip.classList.add('show');
+  const tr = tip.getBoundingClientRect();
+  if(left + tr.width > window.innerWidth - margin) left = window.innerWidth - tr.width - margin;
+  if(top + tr.height > window.innerHeight - margin) top = r.top - tr.height - margin;
+  tip.style.left = Math.max(margin, left) + 'px';
+  tip.style.top = Math.max(margin, top) + 'px';
+}
+function hideButtonTooltip(){
+  clearTimeout(helpTooltipTimer);
+  helpTooltipTimer = null;
+  helpTooltipTarget = null;
+  if(helpTooltipEl) helpTooltipEl.classList.remove('show');
+}
+function initHelpTooltips(){
+  document.addEventListener('mouseover', e=>{
+    const btn = e.target.closest('button');
+    if(!btn || btn.disabled) return;
+    helpTooltipTarget = btn;
+    clearTimeout(helpTooltipTimer);
+    helpTooltipTimer = setTimeout(()=>showButtonTooltip(btn), 520);
+  });
+  document.addEventListener('mouseout', e=>{
+    const btn = e.target.closest('button');
+    if(btn && btn === helpTooltipTarget) hideButtonTooltip();
+  });
+  document.addEventListener('mousemove', e=>{
+    if(helpTooltipTarget && !e.target.closest('button')) hideButtonTooltip();
+  });
+  document.addEventListener('click', e=>{
+    const btn = e.target.closest('button');
+    if(btn && document.activeElement === btn) btn.blur();
+    if(!btn) hideButtonTooltip();
+  });
+  document.addEventListener('focusin', e=>{
+    const btn = e.target.closest('button');
+    if(btn) showButtonTooltip(btn);
+  });
+  document.addEventListener('focusout', e=>{
+    if(e.target.closest('button')) hideButtonTooltip();
+  });
+  document.addEventListener('scroll', hideButtonTooltip, true);
+}
+
+// =====================================================
+// IMPORT/EXPORT
+// =====================================================
+function exportAll(){
+  const blob = new Blob([JSON.stringify(store,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`gp_backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+function importAll(e){
+  const f = e.target.files[0]; if(!f) return;
+  if(f.size > STORAGE_SOFT_LIMIT){
+    alert('控え読込ファイルが大きすぎます。安全のため読み込みを中止しました。');
+    e.target.value = '';
+    return;
+  }
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      const d = safeJsonParse(ev.target.result);
+      if(!d.clients||!d.staff||!d.cases) throw new Error('形式エラー');
+      if(!confirm('既存データを置き換えますか？')) return;
+      store = d;
+      normalizeStore();
+      save({ force:true }); switchTab('dash');
+    } catch(err){ alert('読み込み失敗: '+err.message); }
+  };
+  r.readAsText(f); e.target.value = '';
+}
+
+// =====================================================
+// SAMPLE DATA
+// =====================================================
+function loadSample(){
+  if(!confirm('練習データ（担当3名・顧問先6社・案件8件）を追加しますか？既存データに追加されます')) return;
+  const t = new Date(); const fut = d => { const x=new Date(t); x.setDate(x.getDate()+d); return x.toISOString().slice(0,10); };
+  const past = d => fut(-d);
+  const s1=uid(), s2=uid(), s3=uid();
+  store.staff.push(
+    { id:s1, name:'GREEN代表', role:'代表顧問', email:'Green-PartnerShip@outlook.jp', memo:'全案件責任者', created:t.toISOString() },
+    { id:s2, name:'山田 顧問', role:'シニア顧問', email:'', memo:'ものづくり系専門', created:t.toISOString() },
+    { id:s3, name:'佐藤 アシスタント', role:'事務局', email:'', memo:'書類収集・進捗管理', created:t.toISOString() }
+  );
+  const c1=uid(), c2=uid(), c3=uid(), c4=uid(), c5=uid(), c6=uid();
+  store.clients.push(
+    { id:c1, name:'株式会社 A製作所', industry:'金属加工', type:'法人', employees:'21〜50人', revenue:'3千万〜1億', pref:'愛知県', contact:'田中 製造部長', email:'tanaka@a-mfg.example.jp', plan:'スタンダード', start:past(120), notice:'', staff_id:s2, notes:'設備投資意欲高い', created:t.toISOString() },
+    { id:c2, name:'B カフェ', industry:'飲食', type:'個人事業主', employees:'2〜5人', revenue:'〜1千万円', pref:'東京都', contact:'山本オーナー', email:'b-cafe@example.jp', plan:MINI_PLAN, start:past(60), notice:'', staff_id:s1, notes:'持続化補助金で店舗改装', created:t.toISOString() },
+    { id:c3, name:'C 商事株式会社', industry:'商社', type:'法人', employees:'51〜100人', revenue:'1億〜3億', pref:'大阪府', contact:'鈴木 経営企画', email:'suzuki@c-shoji.example.jp', plan:'プレミアム', start:past(200), notice:'', staff_id:s1, notes:'年4件の申請予定', created:t.toISOString() },
+    { id:c4, name:'D デザイン事務所', industry:'クリエイティブ', type:'法人', employees:'6〜20人', revenue:'3千万〜1億', pref:'福岡県', contact:'中村代表', email:'', plan:'スタンダード', start:past(45), notice:fut(160), staff_id:s2, notes:'⚠️解約予告あり 引き止め要', created:t.toISOString() },
+    { id:c5, name:'E 介護サービス', industry:'介護', type:'法人', employees:'21〜50人', revenue:'1億〜3億', pref:'神奈川県', contact:'高橋施設長', email:'', plan:'スタンダード', start:past(15), notice:'', staff_id:s2, notes:'処遇改善補助金狙い', created:t.toISOString() },
+    { id:c6, name:'F 工務店', industry:'建設', type:'法人', employees:'2〜5人', revenue:'1千万〜3千万', pref:'北海道', contact:'伊藤社長', email:'', plan:'未契約', start:'', notice:'', staff_id:s1, notes:'リード案件 ヒアリング中', created:t.toISOString() }
+  );
+  store.cases.push(
+    { id:uid(), client_id:c1, staff_id:s2, template:'ものづくり', subsidy:'ものづくり補助金', round:'第20次', deadline:fut(40), sub_rate:50, cap:1250, apply:1000, award:0, rate:9, retainer:0, stage:'計画策定中', sub_status:'', due:fut(10), action:'設備見積3社収集', ap_date:'', res_date:'', gr_date:'', rep_due:'', exec_s:'', exec_e:'', docs:{apply_2:true,apply_3:true}, docs_custom:['認定支援機関確認書'], ref_src:'直接', ref_rate:0, ref_date:'', ref_paid:false, memo:'CNC旋盤導入', kasanten:'賃上げ加点+DX加点予定', shinsa:'生産性向上の数値根拠を明示', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c2, staff_id:s1, template:'持続化', subsidy:'小規模事業者持続化補助金（一般型）', round:'第19回', deadline:fut(20), sub_rate:66.67, cap:200, apply:200, award:0, rate:20, retainer:2, stage:'書類・申請書作成', sub_status:'', due:fut(5), action:'様式2最終チェック', ap_date:'', res_date:'', gr_date:'', rep_due:'', exec_s:'', exec_e:'', docs:{apply_0:true,apply_1:true,apply_2:true,apply_4:true,apply_5:true,apply_6:true}, docs_custom:[], ref_src:'直接', ref_rate:0, ref_date:'', ref_paid:false, memo:'店内改装+HPリニューアル', kasanten:'インボイス特例', shinsa:'地域への波及効果を強調', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c3, staff_id:s1, template:'省力化', subsidy:'中小企業省力化投資補助金（カタログ型）', round:'第3回', deadline:past(10), sub_rate:50, cap:1000, apply:500, award:400, rate:7, retainer:0, stage:'採択', sub_status:'', due:past(3), action:'⚠️交付申請書類提出期限超過', ap_date:past(60), res_date:past(15), gr_date:'', rep_due:'', exec_s:'', exec_e:'', docs:{}, docs_custom:[], ref_src:'D デザイン事務所', ref_rate:5, ref_date:'', ref_paid:false, memo:'倉庫管理AIシステム', kasanten:'', shinsa:'', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c3, staff_id:s2, template:'新事業進出', subsidy:'新事業進出補助金', round:'第3回', deadline:fut(60), sub_rate:50, cap:5000, apply:3000, award:0, rate:7, retainer:0, stage:'適合診断', sub_status:'', due:fut(14), action:'再構築要件の事前面談設定', ap_date:'', res_date:'', gr_date:'', rep_due:'', exec_s:'', exec_e:'', docs:{}, docs_custom:[], ref_src:'直接', ref_rate:0, ref_date:'', ref_paid:false, memo:'新規事業ライン投資', kasanten:'', shinsa:'', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c4, staff_id:s2, template:'IT導入', subsidy:'IT導入補助金', round:'2026', deadline:fut(30), sub_rate:50, cap:450, apply:300, award:0, rate:9, retainer:0, stage:'申請済・審査中', sub_status:'', due:fut(45), action:'採択発表待ち', ap_date:past(5), res_date:fut(45), gr_date:'', rep_due:'', exec_s:'', exec_e:'', docs:{}, docs_custom:[], ref_src:'直接', ref_rate:0, ref_date:'', ref_paid:false, memo:'制作管理SaaS導入', kasanten:'', shinsa:'', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c5, staff_id:s2, template:'汎用', subsidy:'業務改善助成金', round:'2026', deadline:fut(50), sub_rate:75, cap:600, apply:400, award:0, rate:9, retainer:0, stage:'計画策定中', sub_status:'', due:fut(7), action:'jGrants登録支援', ap_date:'', res_date:'', gr_date:'', rep_due:'', exec_s:'', exec_e:'', docs:{}, docs_custom:[], ref_src:'直接', ref_rate:0, ref_date:'', ref_paid:false, memo:'記録ソフト+リフトカー', kasanten:'最低賃金引上げ', shinsa:'', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c1, staff_id:s2, template:'省力化', subsidy:'中小企業省力化投資補助金（カタログ型）', round:'第3回', deadline:fut(90), sub_rate:50, cap:1500, apply:800, award:0, rate:9, retainer:0, stage:'初回ヒアリング', sub_status:'', due:fut(21), action:'カタログ製品適合確認', ap_date:'', res_date:'', gr_date:'', rep_due:'', exec_s:'', exec_e:'', docs:{}, docs_custom:[], ref_src:'直接', ref_rate:0, ref_date:'', ref_paid:false, memo:'2件目案件', kasanten:'', shinsa:'', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c6, staff_id:s1, template:'持続化', subsidy:'小規模事業者持続化補助金（一般型）', round:'第19回', deadline:fut(35), sub_rate:66.67, cap:50, apply:50, award:0, rate:15, retainer:2, stage:'初回ヒアリング', sub_status:'', due:fut(3), action:'初回ZOOM日程確定', ap_date:'', res_date:'', gr_date:'', rep_due:'', exec_s:'', exec_e:'', docs:{}, docs_custom:[], ref_src:'直接', ref_rate:0, ref_date:'', ref_paid:false, memo:'スポット案件想定', kasanten:'', shinsa:'', created:t.toISOString(), updated:t.toISOString() }
+  );
+  store.chats.push(
+    { id:uid(), client_id:c2, staff_id:s1, date:past(2), count:4, summary:'持続化補助金の対象経費と店舗改装見積の確認', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c2, staff_id:s1, date:past(7), count:5, summary:'様式2の販路開拓計画に関する質問対応', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c2, staff_id:s3, date:past(1), count:3, summary:'必要書類の不足確認と提出方法の案内', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c1, staff_id:s2, date:past(3), count:2, summary:'設備見積と補助対象経費の整理', created:t.toISOString(), updated:t.toISOString() },
+    { id:uid(), client_id:c4, staff_id:s2, date:past(6), count:4, summary:'IT導入補助金の採択発表予定と導入スケジュール確認', created:t.toISOString(), updated:t.toISOString() }
+  );
+  save(); switchTab('dash');
+}
+
+// =====================================================
+// INIT
+// =====================================================
+async function initApp(){
+  await load();
+  switchTab('dash');
+  initHelpTooltips();
+  startSharedRefresh();
+  document.getElementById('lastSave').textContent = sharedMode
+    ? "社内共有データ接続中: " + new Date().toLocaleString('ja-JP')
+    : "このブラウザ内保存で起動: " + new Date().toLocaleString('ja-JP');
+}
+initApp();
+</script>
+</body>
+</html>

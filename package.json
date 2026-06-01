@@ -1,5 +1,5 @@
 {
-  "name": "niche-hojokin-finder-app",
+  "name": "hojokin-app-cloud",
   "version": "1.2.0",
   "description": "国・都道府県・市区町村の補助金・助成金・奨励金を検索し、Claude / ChatGPT Web向けの調査プロンプトを作るローカルアプリです。AI APIキーは使いません。",
   "main": "main.cjs",

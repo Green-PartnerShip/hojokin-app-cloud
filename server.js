@@ -31,6 +31,8 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const SESSION_TTL_MS = Math.max(1, Number(process.env.SESSION_TTL_HOURS || 12)) * 60 * 60 * 1000;
 const sessions = new Map();
 const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
+const GP_APP_FILE = path.join(__dirname, "public", "GP業務管理.html");
+const GP_SHARED_DATA_LIMIT = Number(process.env.GP_SHARED_DATA_LIMIT || 5 * 1024 * 1024);
 
 const getDbSslConfig = () => {
   if (!DATABASE_URL) return undefined;
@@ -759,14 +761,19 @@ const renderInternalHub = () => `<!doctype html>
       <a class="logout" href="/logout">ログアウト</a>
     </header>
     <section class="grid" aria-label="利用できるアプリ">
-      <a class="tile" href="/">
-        <span class="tag">検索</span>
-        <strong>補助金検索</strong>
-        <span>国・自治体の補助金を探し、候補整理に使います。</span>
-      </a>
-      <a class="tile" href="/internal/hearing/company">
-        <span class="tag">共有保存</span>
-        <strong>ヒアリング整理（会社用）</strong>
+        <a class="tile" href="/">
+          <span class="tag">検索</span>
+          <strong>補助金検索</strong>
+          <span>国・自治体の補助金を探し、候補整理に使います。</span>
+        </a>
+        <a class="tile" href="/internal/gp">
+          <span class="tag">業務管理</span>
+          <strong>GP業務管理</strong>
+          <span>顧問先、案件進捗、チャット相談、書類ひな形、月次レポートを管理します。</span>
+        </a>
+        <a class="tile" href="/internal/hearing/company">
+          <span class="tag">共有保存</span>
+          <strong>ヒアリング整理（会社用）</strong>
         <span>法人・会社向けのヒアリング内容を整理し、社内で共有保存します。</span>
       </a>
       <a class="tile" href="/internal/hearing/personal">
@@ -842,7 +849,7 @@ const authGuard = (req, res, next) => {
 
 app.use(securityHeaders);
 app.use(networkAccessGuard);
-app.use(express.json({ limit: "2mb", type: "application/json" }));
+app.use(express.json({ limit: "6mb", type: "application/json" }));
 app.use(express.urlencoded({ extended: false, limit: "200kb" }));
 
 app.get("/login", (req, res) => {
@@ -902,8 +909,69 @@ app.use("/api", apiAccessGuard, rateLimit({ name: "api", windowMs: 60 * 1000, ma
 app.use("/explanation/api", apiAccessGuard, rateLimit({ name: "explanation-api", windowMs: 60 * 1000, max: 180 }));
 app.use("/internal/hearing/api", apiAccessGuard, rateLimit({ name: "hearing-api", windowMs: 60 * 1000, max: 240 }));
 
+app.get("/app-switch", (_req, res) => {
+  res.type("html").send(`<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>アプリ切替 - 補助金クラウド</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f7fb;color:#1a202c;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Yu Gothic UI",sans-serif}
+    .window{width:min(760px,calc(100vw - 32px));background:#fff;border:1px solid #dbe3ef;border-radius:10px;padding:26px;box-shadow:0 16px 42px rgba(20,40,70,.12)}
+    h1{margin:0 0 8px;font-size:24px}
+    p{margin:0;color:#64748b;line-height:1.75}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:18px}
+    .tile{border:1px solid #dbe3ef;border-radius:8px;padding:15px;background:#fff}
+    .tile.primary{border-color:#2d5a3d;background:#f5f8f5}
+    .tile h2{margin:0 0 6px;font-size:16px;color:#1f4a30}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+    a.button,button{border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1a202c;padding:10px 14px;font-size:14px;font-weight:700;text-decoration:none;cursor:pointer}
+    .open{background:#2d5a3d!important;color:#fff!important;border-color:#2d5a3d!important}
+    .small{margin-top:14px;font-size:12px;color:#64748b}
+  </style>
+</head>
+<body>
+  <main class="window">
+    <h1>アプリ切替</h1>
+    <p>このWebサービス内で使うアプリを選べます。</p>
+    <div class="grid">
+      <section class="tile primary">
+        <h2>GREEN PARTNERSHIP 業務管理</h2>
+        <p>顧問先、案件進捗、チャット相談、書類ひな形、カレンダー、月次レポートを管理します。</p>
+        <div class="actions">
+          <a class="button open" href="/internal/gp">GP業務管理を開く</a>
+          <button type="button" onclick="window.open('/internal/gp','gpBusinessManagement','width=1280,height=860,noopener')">別ウィンドウで開く</button>
+        </div>
+      </section>
+      <section class="tile">
+        <h2>統合メニュー</h2>
+        <p>補助金検索、ヒアリング、説明変換、タスク管理の入口へ戻ります。</p>
+        <div class="actions">
+          <a class="button" href="/internal">統合メニューを開く</a>
+        </div>
+      </section>
+    </div>
+    <div class="small">トップ画面からも「アプリ切替」または「GP業務管理」ボタンで開けます。</div>
+  </main>
+</body>
+</html>`);
+});
+
 app.get(["/internal", "/internal/"], (_req, res) => {
   res.type("html").send(renderInternalHub());
+});
+
+app.get(["/internal/gp", "/internal/gp/", "/gp", "/gp/", "/GP業務管理.html"], async (_req, res) => {
+  try {
+    const html = await fs.promises.readFile(GP_APP_FILE, "utf8");
+    res.setHeader("Cache-Control", "no-store");
+    res.type("html").send(html);
+  } catch (error) {
+    console.error(error);
+    res.status(500).type("text/plain").send("GP業務管理を読み込めませんでした。");
+  }
 });
 
 app.get(["/internal/hearing", "/internal/hearing/"], (_req, res) => {
@@ -1248,7 +1316,25 @@ const initDb = async () => {
 
       CREATE INDEX IF NOT EXISTS idx_saved_subsidies_created_at
         ON saved_subsidies (created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS gp_shared_store (
+        id TEXT PRIMARY KEY,
+        revision INTEGER NOT NULL,
+        updated_at TIMESTAMPTZ,
+        data JSONB NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS gp_shared_backups (
+        id BIGSERIAL PRIMARY KEY,
+        revision INTEGER NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        data JSONB NOT NULL
+      );
     `);
+    await dbPool.query(
+      "INSERT INTO gp_shared_store (id, revision, updated_at, data) VALUES ($1, 0, NULL, $2::jsonb) ON CONFLICT (id) DO NOTHING",
+      ["main", JSON.stringify({ clients: [], staff: [], cases: [], chats: [], templates: {} })]
+    );
     dbStatus.ready = true;
     dbStatus.error = "";
     console.log("[db] shared database is ready");
@@ -1274,6 +1360,59 @@ const sharedDbUnavailable = () => ({
   history: [],
   message: "Shared database is not connected."
 });
+
+const defaultGpStore = () => ({ clients: [], staff: [], cases: [], chats: [], templates: {} });
+
+const normalizeGpStore = (data) => {
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("shared data must be an object");
+  const normalized = {
+    clients: Array.isArray(data.clients) ? data.clients : [],
+    staff: Array.isArray(data.staff) ? data.staff : [],
+    cases: Array.isArray(data.cases) ? data.cases : [],
+    chats: Array.isArray(data.chats) ? data.chats : [],
+    templates: data.templates && typeof data.templates === "object" && !Array.isArray(data.templates) ? data.templates : {}
+  };
+  if (Buffer.byteLength(JSON.stringify(normalized), "utf8") > GP_SHARED_DATA_LIMIT) {
+    throw new Error("shared data is too large");
+  }
+  return normalized;
+};
+
+const readGpEnvelope = async () => {
+  const pool = await ensureDbReady();
+  const { rows } = await pool.query("SELECT revision, updated_at, data FROM gp_shared_store WHERE id = $1", ["main"]);
+  if (!rows.length) {
+    await pool.query(
+      "INSERT INTO gp_shared_store (id, revision, updated_at, data) VALUES ($1, 0, NULL, $2::jsonb) ON CONFLICT (id) DO NOTHING",
+      ["main", JSON.stringify(defaultGpStore())]
+    );
+    return { revision: 0, updatedAt: null, data: defaultGpStore() };
+  }
+  const row = rows[0];
+  return {
+    revision: Number(row.revision) || 0,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : null,
+    data: row.data && typeof row.data === "object" ? row.data : defaultGpStore()
+  };
+};
+
+const backupGpEnvelope = async (envelope) => {
+  try {
+    const pool = await ensureDbReady();
+    await pool.query(
+      "INSERT INTO gp_shared_backups (revision, data) VALUES ($1, $2::jsonb)",
+      [envelope.revision || 0, JSON.stringify(envelope.data || defaultGpStore())]
+    );
+    await pool.query(`
+      DELETE FROM gp_shared_backups
+      WHERE id NOT IN (
+        SELECT id FROM gp_shared_backups ORDER BY id DESC LIMIT 30
+      )
+    `);
+  } catch (e) {
+    console.warn("[db] GP backup skipped:", e.message);
+  }
+};
 
 const dbText = (value, maxLength = 500) => cleanInput(value, "", maxLength);
 
@@ -1836,6 +1975,49 @@ app.get("/api/shared/status", async (_req, res) => {
     storage: "postgres",
     error: dbStatus.ready ? "" : dbStatus.error
   });
+});
+
+app.get("/api/store", async (_req, res) => {
+  if (!dbPool) return res.status(503).json({ ok: false, error: "Shared database is not connected." });
+  try {
+    const envelope = await readGpEnvelope();
+    res.json({ ok: true, ...envelope });
+  } catch (e) {
+    res.status(503).json({ ok: false, error: e.message });
+  }
+});
+
+app.put("/api/store", async (req, res) => {
+  if (!dbPool) return res.status(503).json({ ok: false, error: "Shared database is not connected." });
+  try {
+    const payload = req.body || {};
+    const expected = Number(payload.revision || 0);
+    const force = payload.force === true;
+    const current = await readGpEnvelope();
+    if (!force && expected !== current.revision) {
+      return res.status(409).json({ ok: false, error: "revision conflict", ...current });
+    }
+    const next = {
+      revision: current.revision + 1,
+      updatedAt: new Date().toISOString(),
+      data: normalizeGpStore(payload.data)
+    };
+    await backupGpEnvelope(current);
+    const pool = await ensureDbReady();
+    const { rowCount } = await pool.query(
+      `UPDATE gp_shared_store
+       SET revision = $2, updated_at = $3, data = $4::jsonb
+       WHERE id = $1 AND ($5::boolean OR revision = $6)`,
+      ["main", next.revision, next.updatedAt, JSON.stringify(next.data), force, current.revision]
+    );
+    if (!rowCount) {
+      const latest = await readGpEnvelope();
+      return res.status(409).json({ ok: false, error: "revision conflict", ...latest });
+    }
+    res.json({ ok: true, ...next });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.message });
+  }
 });
 
 app.get("/api/shared/history", async (req, res) => {
