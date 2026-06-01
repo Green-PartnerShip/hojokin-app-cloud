@@ -13,6 +13,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import os from "os";
 import crypto from "crypto";
+import pg from "pg";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -26,6 +27,32 @@ const APP_PASSWORD_HASH = process.env.APP_PASSWORD_HASH || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "";
 const SESSION_TTL_MS = Math.max(1, Number(process.env.SESSION_TTL_HOURS || 12)) * 60 * 60 * 1000;
 const sessions = new Map();
+const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || "";
+
+const getDbSslConfig = () => {
+  if (!DATABASE_URL) return undefined;
+  if (truthy(process.env.DATABASE_SSL)) return { rejectUnauthorized: false };
+  try {
+    const sslMode = new URL(DATABASE_URL).searchParams.get("sslmode");
+    if (sslMode && sslMode !== "disable") return { rejectUnauthorized: false };
+  } catch {
+    // Keep default connection settings for non-URL connection strings.
+  }
+  return undefined;
+};
+
+const { Pool } = pg;
+const dbPool = DATABASE_URL
+  ? new Pool({
+      connectionString: DATABASE_URL,
+      max: 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+      ssl: getDbSslConfig()
+    })
+  : null;
+const dbStatus = { enabled: !!dbPool, ready: false, error: "" };
+let dbInitPromise = null;
 
 if (PUBLIC_ACCESS) {
   app.set("trust proxy", 1);
@@ -317,6 +344,100 @@ const cleanInput = (value, def = "", maxLength = 100) => asStr(value, def)
   .slice(0, maxLength);
 
 const isValidJgrantsId = (value) => /^[A-Za-z0-9_-]{1,80}$/.test(asStr(value));
+
+const initDb = async () => {
+  if (!dbPool) return;
+  try {
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS shared_search_history (
+        id BIGSERIAL PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        keyword TEXT NOT NULL DEFAULT '',
+        prefecture TEXT NOT NULL DEFAULT '',
+        municipality TEXT NOT NULL DEFAULT '',
+        theme TEXT NOT NULL DEFAULT '',
+        industry TEXT NOT NULL DEFAULT '',
+        employees TEXT NOT NULL DEFAULT '',
+        entity TEXT NOT NULL DEFAULT '',
+        result_count INTEGER NOT NULL DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'jgrants'
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_shared_search_history_created_at
+        ON shared_search_history (created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS saved_subsidies (
+        id BIGSERIAL PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        subsidy_id TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        issuer TEXT NOT NULL DEFAULT '',
+        target_area TEXT NOT NULL DEFAULT '',
+        acceptance_start TEXT NOT NULL DEFAULT '',
+        acceptance_end TEXT NOT NULL DEFAULT '',
+        subsidy_min_limit TEXT NOT NULL DEFAULT '',
+        subsidy_max_limit TEXT NOT NULL DEFAULT '',
+        subsidy_rate TEXT NOT NULL DEFAULT '',
+        use_purpose TEXT NOT NULL DEFAULT '',
+        detail_url TEXT NOT NULL DEFAULT '',
+        source_url TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT ''
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_saved_subsidies_created_at
+        ON saved_subsidies (created_at DESC);
+    `);
+    dbStatus.ready = true;
+    dbStatus.error = "";
+    console.log("[db] shared database is ready");
+  } catch (e) {
+    dbStatus.ready = false;
+    dbStatus.error = e.message;
+    console.warn("[db] shared database is not ready:", e.message);
+  }
+};
+
+const ensureDbReady = async () => {
+  if (!dbPool) return null;
+  if (!dbInitPromise || (!dbStatus.ready && dbStatus.error)) dbInitPromise = initDb();
+  await dbInitPromise;
+  if (!dbStatus.ready) throw new Error(dbStatus.error || "Shared database is not ready");
+  return dbPool;
+};
+
+const sharedDbUnavailable = () => ({
+  ok: true,
+  enabled: false,
+  items: [],
+  history: [],
+  message: "Shared database is not connected."
+});
+
+const dbText = (value, maxLength = 500) => cleanInput(value, "", maxLength);
+
+const recordSearchHistory = async (query, resultCount) => {
+  if (!dbPool) return;
+  try {
+    const pool = await ensureDbReady();
+    await pool.query(`
+      INSERT INTO shared_search_history
+        (keyword, prefecture, municipality, theme, industry, employees, entity, result_count, source)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'jgrants')
+    `, [
+      dbText(query.keyword, 120),
+      dbText(query.prefecture, 40),
+      dbText(query.municipality, 120),
+      dbText(query.theme, 120),
+      dbText(query.industry, 120),
+      dbText(query.employees, 40),
+      dbText(query.entity, 80),
+      Math.max(0, Number(resultCount) || 0)
+    ]);
+  } catch (e) {
+    console.warn("[db] search history skipped:", e.message);
+  }
+};
 
 const upstreamErrorPayload = (error, fallback = {}) => ({
   ok: false,
@@ -669,6 +790,7 @@ app.get("/api/search-jgrants", rateLimit({ name: "search", windowMs: 5 * 60 * 10
     }));
 
     await enrichItemsWithDetails(normalized);
+    await recordSearchHistory(req.query, normalized.length);
 
     res.json({ ok: true, source: "jgrants", count: normalized.length, items: normalized });
   } catch (e) {
@@ -739,12 +861,132 @@ app.post("/api/ask-ai", (_req, res) => {
   });
 });
 
+app.get("/api/shared/status", async (_req, res) => {
+  if (!dbPool) return res.json({ ok: true, enabled: false, ready: false });
+  try {
+    await ensureDbReady();
+  } catch {
+    // Keep the main app available even when the shared DB is temporarily unavailable.
+  }
+  res.json({
+    ok: true,
+    enabled: true,
+    ready: dbStatus.ready,
+    error: dbStatus.ready ? "" : dbStatus.error
+  });
+});
+
+app.get("/api/shared/history", async (req, res) => {
+  if (!dbPool) return res.json(sharedDbUnavailable());
+  try {
+    const pool = await ensureDbReady();
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const { rows } = await pool.query(`
+      SELECT id, created_at, keyword, prefecture, municipality, theme, industry, employees, entity, result_count, source
+      FROM shared_search_history
+      ORDER BY created_at DESC
+      LIMIT $1
+    `, [limit]);
+    res.json({ ok: true, enabled: true, history: rows });
+  } catch (e) {
+    res.status(503).json({ ok: false, enabled: true, error: e.message });
+  }
+});
+
+app.get("/api/shared/saved", async (req, res) => {
+  if (!dbPool) return res.json(sharedDbUnavailable());
+  try {
+    const pool = await ensureDbReady();
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
+    const { rows } = await pool.query(`
+      SELECT id, created_at, updated_at, subsidy_id, title, issuer, target_area,
+             acceptance_start, acceptance_end, subsidy_min_limit, subsidy_max_limit,
+             subsidy_rate, use_purpose, detail_url, source_url, note
+      FROM saved_subsidies
+      ORDER BY updated_at DESC
+      LIMIT $1
+    `, [limit]);
+    res.json({ ok: true, enabled: true, items: rows });
+  } catch (e) {
+    res.status(503).json({ ok: false, enabled: true, error: e.message });
+  }
+});
+
+app.post("/api/shared/saved", async (req, res) => {
+  if (!dbPool) return res.status(503).json({ ok: false, enabled: false, error: "Shared database is not connected." });
+  try {
+    const item = req.body?.item || req.body || {};
+    const subsidyId = dbText(item.id || item.subsidy_id, 120);
+    const title = dbText(item.subsidy_name || item.title || item.name, 500);
+    if (!subsidyId || !title) return res.status(400).json({ ok: false, error: "Invalid subsidy item." });
+
+    const pool = await ensureDbReady();
+    const { rows } = await pool.query(`
+      INSERT INTO saved_subsidies
+        (subsidy_id, title, issuer, target_area, acceptance_start, acceptance_end,
+         subsidy_min_limit, subsidy_max_limit, subsidy_rate, use_purpose, detail_url, source_url, note)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ON CONFLICT (subsidy_id) DO UPDATE SET
+        title = EXCLUDED.title,
+        issuer = EXCLUDED.issuer,
+        target_area = EXCLUDED.target_area,
+        acceptance_start = EXCLUDED.acceptance_start,
+        acceptance_end = EXCLUDED.acceptance_end,
+        subsidy_min_limit = EXCLUDED.subsidy_min_limit,
+        subsidy_max_limit = EXCLUDED.subsidy_max_limit,
+        subsidy_rate = EXCLUDED.subsidy_rate,
+        use_purpose = EXCLUDED.use_purpose,
+        detail_url = EXCLUDED.detail_url,
+        source_url = EXCLUDED.source_url,
+        note = EXCLUDED.note,
+        updated_at = NOW()
+      RETURNING id, created_at, updated_at, subsidy_id, title, issuer, target_area,
+                acceptance_start, acceptance_end, subsidy_min_limit, subsidy_max_limit,
+                subsidy_rate, use_purpose, detail_url, source_url, note
+    `, [
+      subsidyId,
+      title,
+      dbText(item.issuer, 300),
+      dbText(item.target_area, 300),
+      dbText(item.acceptance_start, 80),
+      dbText(item.acceptance_end, 80),
+      dbText(item.subsidy_min_limit, 80),
+      dbText(item.subsidy_max_limit, 80),
+      dbText(item.subsidy_rate, 300),
+      dbText(item.use_purpose, 2500),
+      dbText(item.detail_url || item.front_subsidy_detail_page_url, 1000),
+      dbText(item.official_source_url || item.source_url, 1000),
+      dbText(item.note, 1000)
+    ]);
+    res.json({ ok: true, enabled: true, item: rows[0] });
+  } catch (e) {
+    res.status(503).json({ ok: false, enabled: true, error: e.message });
+  }
+});
+
+app.delete("/api/shared/saved/:id", async (req, res) => {
+  if (!dbPool) return res.status(503).json({ ok: false, enabled: false, error: "Shared database is not connected." });
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id < 1) return res.status(400).json({ ok: false, error: "Invalid saved item id." });
+  try {
+    const pool = await ensureDbReady();
+    const { rowCount } = await pool.query("DELETE FROM saved_subsidies WHERE id = $1", [id]);
+    res.json({ ok: true, deleted: rowCount });
+  } catch (e) {
+    res.status(503).json({ ok: false, enabled: true, error: e.message });
+  }
+});
+
 // ----- ヘルスチェック -----
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     ts: new Date().toISOString(),
     ai_mode: "web",
+    shared_db: {
+      enabled: dbStatus.enabled,
+      ready: dbStatus.ready
+    },
     lan_urls: getLanUrls(ACTIVE_PORT)
   });
 });
@@ -784,6 +1026,10 @@ function startServer(port, retriesLeft = 5) {
       process.exit(1);
     }
   });
+}
+
+if (dbPool) {
+  dbInitPromise = initDb();
 }
 
 startServer(PORT_PREFERRED);

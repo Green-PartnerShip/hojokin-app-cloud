@@ -48,7 +48,7 @@
   .manual-result { margin-top:12px; }
   .gridjs-wrapper { font-size:13px; overflow-x:auto; scrollbar-width:none; }
   .gridjs-wrapper::-webkit-scrollbar { height:0; }
-  #grid table.gridjs-table { width:max-content; min-width:1925px; table-layout:fixed; }
+  #grid table.gridjs-table { width:max-content; min-width:2020px; table-layout:fixed; }
   #grid th.gridjs-th, #grid td.gridjs-td { white-space:normal; overflow:visible; text-overflow:clip; line-height:1.45; word-break:break-word; }
   #grid th.gridjs-th .gridjs-th-content { white-space:normal; overflow:visible; text-overflow:clip; }
   #grid td.gridjs-td { vertical-align:top; }
@@ -56,6 +56,17 @@
   .grid-floating-scroll-inner { height:1px; }
   .official-source-link { color:#2b6cb0; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
   .official-source-link:hover { color:#2c5282; }
+  .btn-small { padding:6px 10px; font-size:12px; border-radius:5px; }
+  .btn-danger { background:#fee2e2; color:#991b1b; }
+  .shared-panel { border:1px solid var(--gray-200); border-radius:8px; padding:14px; background:#fff; }
+  .shared-toolbar { display:flex; gap:8px; align-items:center; justify-content:space-between; flex-wrap:wrap; margin-bottom:10px; }
+  .shared-list { display:grid; gap:10px; }
+  .saved-card { border:1px solid var(--gray-200); border-radius:8px; padding:12px; background:#fbfdff; }
+  .saved-card h3 { margin:0 0 6px; font-size:14px; line-height:1.5; }
+  .saved-meta { color:var(--gray-600); font-size:12px; line-height:1.6; }
+  .shared-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .shared-table th, .shared-table td { border-bottom:1px solid var(--gray-200); padding:8px; text-align:left; vertical-align:top; }
+  .shared-table th { background:#f8fafc; color:#334155; }
   .purpose-cell { color:#1a202c; font-weight:500; line-height:1.55; }
   .muted-cell { color:#718096; font-size:12px; }
   .due-soon { background:var(--red-bg); color:var(--red); padding:1px 6px; border-radius:4px; }
@@ -150,6 +161,8 @@
   <div class="tabs">
     <div class="tab active" data-tab="jgrants">jグランツ検索結果</div>
     <div class="tab" data-tab="ai">AI補完結果</div>
+    <div class="tab" data-tab="saved">共有保存リスト</div>
+    <div class="tab" data-tab="history">検索履歴</div>
   </div>
 
   <div id="tab-jgrants" class="tab-content active">
@@ -158,6 +171,26 @@
 
   <div id="tab-ai" class="tab-content">
     <div id="ai-result"><div class="empty">Claude / ChatGPT 用の質問文をローカルで作成し、クリップボードにコピーしてからWeb版を開きます。</div></div>
+  </div>
+
+  <div id="tab-saved" class="tab-content">
+    <div class="shared-panel">
+      <div class="shared-toolbar">
+        <b>社員共有の保存リスト</b>
+        <button class="btn-secondary btn-small" id="btn-refresh-saved">再読み込み</button>
+      </div>
+      <div id="saved-list"><div class="empty">検索結果の「共有保存」から保存できます。</div></div>
+    </div>
+  </div>
+
+  <div id="tab-history" class="tab-content">
+    <div class="shared-panel">
+      <div class="shared-toolbar">
+        <b>社員共有の検索履歴</b>
+        <button class="btn-secondary btn-small" id="btn-refresh-history">再読み込み</button>
+      </div>
+      <div id="history-list"><div class="empty">検索するとここに履歴が残ります。</div></div>
+    </div>
   </div>
 
   <div class="footer">
@@ -172,6 +205,7 @@ let REGIONS = null;
 let floatingGridScroll = null;
 let activeGridWrapper = null;
 let scrollSyncing = false;
+let latestJgrantsItems = [];
 
 async function loadRegions() {
   const r = await fetch("./data/municipality-groups.json");
@@ -256,6 +290,8 @@ function setStatus(msg, isErr=false) {
 function activateTab(name) {
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   document.querySelectorAll(".tab-content").forEach(c => c.classList.toggle("active", c.id === `tab-${name}`));
+  if (name === "saved") loadSharedSaved();
+  if (name === "history") loadSharedHistory();
 }
 
 function daysUntil(dateStr) {
@@ -301,13 +337,24 @@ async function searchJgrants() {
   activateTab("jgrants");
 
   try {
-    const params = new URLSearchParams({ keyword, prefecture, acceptance: "1" });
+    const params = new URLSearchParams({
+      keyword,
+      prefecture,
+      municipality: getSelectedMunicipality(),
+      theme: document.getElementById("f-theme").value,
+      industry: document.getElementById("f-industry").value.trim(),
+      employees: document.getElementById("f-employees").value,
+      entity: document.getElementById("f-entity").value,
+      acceptance: "1"
+    });
     const r = await fetch(`/api/search-jgrants?${params}`);
     const data = await r.json();
     if (!data.ok) throw new Error(data.error || "取得失敗");
 
     const items = data.items || [];
+    latestJgrantsItems = items;
     renderJgrantsTable(items);
+    loadSharedHistory(false);
     const muni = getSelectedMunicipality();
     const note = muni ? `※ ${muni} に絞り込みたい場合はWeb版AIボタンも併用してください（市区町村独自制度はjグランツに載らないことが多い）。` : "";
     setStatus(`${items.length} 件取得（受付中のみ）。${note}`);
@@ -327,7 +374,7 @@ function renderJgrantsTable(items) {
     return;
   }
 
-  const rows = items.map(it => {
+  const rows = items.map((it, index) => {
     const dEnd = daysUntil(it.acceptance_end);
     const dLabel = dEnd === null ? "-" : (dEnd < 0 ? "超過" : `あと${dEnd}日`);
     const title = it.subsidy_name || it.name || "-";
@@ -349,6 +396,7 @@ function renderJgrantsTable(items) {
       fmtMoneyYen(it.subsidy_max_limit),
       it.subsidy_rate || "詳細で確認",
       it.use_purpose || "-",
+      index,
       it.front_subsidy_detail_page_url || it.detail_url || ""
     ];
   });
@@ -379,6 +427,7 @@ function renderJgrantsTable(items) {
       { name: "上限", width: "135px" },
       { name: "補助率詳細", width: "170px", formatter: (cell) => cell === "詳細で確認" ? gridjs.html(`<span class="muted-cell">${cell}</span>`) : cell },
       { name: "用途概要", width: "430px", formatter: (cell) => cell && cell !== "-" ? gridjs.html(`<span class="purpose-cell">${escapeHtml(cell)}</span>`) : "-" },
+      { name: "共有保存", width: "95px", sort: false, formatter: (cell) => gridjs.html(`<button class="btn-secondary btn-small save-subsidy" data-result-index="${cell}">保存</button>`) },
       { name: "詳細", width: "80px", formatter: (cell) => cell ? gridjs.html(`<a href="${escapeHtml(cell)}" target="_blank" rel="noopener" style="color:#2b6cb0">jグランツ↗</a>`) : "-" }
     ],
     data: rows,
@@ -614,6 +663,152 @@ function renderPastedAnswer() {
   setStatus("貼り付けた回答を表示しました。");
 }
 
+function fmtDateTime(s) {
+  if (!s) return "-";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  return d.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function sharedDbEmpty(message) {
+  return `<div class="empty">${escapeHtml(message)}</div>`;
+}
+
+async function loadSharedSaved(showStatus=false) {
+  const box = document.getElementById("saved-list");
+  if (!box) return;
+  try {
+    const r = await fetch("/api/shared/saved?limit=100");
+    const data = await r.json();
+    if (!data.enabled) {
+      box.innerHTML = sharedDbEmpty("共有DBはまだ接続されていません。クラウドDB接続後に社員間で保存リストを共有できます。");
+      return;
+    }
+    if (!data.ok) throw new Error(data.error || "保存リストの取得に失敗しました");
+    renderSharedSaved(data.items || []);
+    if (showStatus) setStatus("共有保存リストを再読み込みしました。");
+  } catch (e) {
+    box.innerHTML = sharedDbEmpty(`保存リストの取得に失敗しました: ${e.message}`);
+    if (showStatus) setStatus(`保存リストの取得に失敗しました: ${e.message}`, true);
+  }
+}
+
+function renderSharedSaved(items) {
+  const box = document.getElementById("saved-list");
+  if (!box) return;
+  if (!items.length) {
+    box.innerHTML = sharedDbEmpty("まだ保存された補助金はありません。検索結果の「保存」から追加できます。");
+    return;
+  }
+  box.innerHTML = `
+    <div class="shared-list">
+      ${items.map(item => {
+        const url = item.source_url || item.detail_url || "";
+        return `
+          <div class="saved-card">
+            <h3>${escapeHtml(item.title || "-")}</h3>
+            <div class="saved-meta">
+              実施主体：${escapeHtml(item.issuer || "-")} ／ 対象地域：${escapeHtml(item.target_area || "-")} ／ 締切：${escapeHtml(fmtDate(item.acceptance_end))}
+              <br>上限：${escapeHtml(item.subsidy_max_limit || "-")} ／ 補助率：${escapeHtml(item.subsidy_rate || "-")} ／ 保存日時：${escapeHtml(fmtDateTime(item.updated_at || item.created_at))}
+            </div>
+            ${item.use_purpose ? `<div class="info">${escapeHtml(item.use_purpose)}</div>` : ""}
+            <div class="actions" style="margin-top:8px">
+              ${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener"><button class="btn-secondary btn-small">公式・詳細を開く</button></a>` : ""}
+              <button class="btn-danger btn-small delete-saved" data-saved-id="${escapeHtml(item.id)}">削除</button>
+            </div>
+          </div>`;
+      }).join("")}
+    </div>`;
+}
+
+async function saveSharedSubsidy(index) {
+  const item = latestJgrantsItems[Number(index)];
+  if (!item) return;
+  try {
+    const r = await fetch("/api/shared/saved", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item })
+    });
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || "保存に失敗しました");
+    setStatus("共有保存リストに保存しました。");
+    loadSharedSaved(false);
+  } catch (e) {
+    setStatus(`共有保存に失敗しました: ${e.message}`, true);
+  }
+}
+
+async function deleteSharedSaved(id) {
+  try {
+    const r = await fetch(`/api/shared/saved/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || "削除に失敗しました");
+    setStatus("共有保存リストから削除しました。");
+    loadSharedSaved(false);
+  } catch (e) {
+    setStatus(`削除に失敗しました: ${e.message}`, true);
+  }
+}
+
+async function loadSharedHistory(showStatus=false) {
+  const box = document.getElementById("history-list");
+  if (!box) return;
+  try {
+    const r = await fetch("/api/shared/history?limit=20");
+    const data = await r.json();
+    if (!data.enabled) {
+      box.innerHTML = sharedDbEmpty("共有DBはまだ接続されていません。クラウドDB接続後に検索履歴を共有できます。");
+      return;
+    }
+    if (!data.ok) throw new Error(data.error || "検索履歴の取得に失敗しました");
+    renderSharedHistory(data.history || []);
+    if (showStatus) setStatus("検索履歴を再読み込みしました。");
+  } catch (e) {
+    box.innerHTML = sharedDbEmpty(`検索履歴の取得に失敗しました: ${e.message}`);
+    if (showStatus) setStatus(`検索履歴の取得に失敗しました: ${e.message}`, true);
+  }
+}
+
+function renderSharedHistory(history) {
+  const box = document.getElementById("history-list");
+  if (!box) return;
+  if (!history.length) {
+    box.innerHTML = sharedDbEmpty("まだ検索履歴はありません。検索すると自動で記録されます。");
+    return;
+  }
+  box.innerHTML = `
+    <table class="shared-table">
+      <thead>
+        <tr><th>日時</th><th>条件</th><th>件数</th></tr>
+      </thead>
+      <tbody>
+        ${history.map(row => {
+          const parts = [
+            row.prefecture || "全国",
+            row.municipality,
+            row.theme,
+            row.keyword,
+            row.industry,
+            row.employees ? `${row.employees}名` : "",
+            row.entity
+          ].filter(Boolean).join(" / ");
+          return `<tr>
+            <td>${escapeHtml(fmtDateTime(row.created_at))}</td>
+            <td>${escapeHtml(parts || "-")}</td>
+            <td>${escapeHtml(row.result_count ?? "-")}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>`;
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c]);
 }
@@ -624,12 +819,19 @@ document.getElementById("f-other-municipality").addEventListener("change", () =>
 document.getElementById("btn-search").addEventListener("click", searchJgrants);
 document.getElementById("btn-web-claude").addEventListener("click", () => launchWebAi("claude"));
 document.getElementById("btn-web-chatgpt").addEventListener("click", () => launchWebAi("chatgpt"));
+document.getElementById("btn-refresh-saved").addEventListener("click", () => loadSharedSaved(true));
+document.getElementById("btn-refresh-history").addEventListener("click", () => loadSharedHistory(true));
 document.getElementById("btn-clear").addEventListener("click", () => {
   ["f-prefecture","f-major-municipality","f-other-municipality","f-keyword","f-theme","f-industry","f-employees","f-entity"].forEach(id => document.getElementById(id).value = "");
   onPrefChange();
   setStatus("条件をクリアしました");
 });
 document.getElementById("grid").addEventListener("click", (ev) => {
+  const saveBtn = ev.target.closest(".save-subsidy");
+  if (saveBtn) {
+    saveSharedSubsidy(saveBtn.dataset.resultIndex);
+    return;
+  }
   const link = ev.target.closest(".official-source-link");
   if (!link) return;
   if (link.dataset.officialUrl) {
@@ -638,6 +840,11 @@ document.getElementById("grid").addEventListener("click", (ev) => {
   }
   ev.preventDefault();
   openOfficialSource(link);
+});
+document.getElementById("saved-list").addEventListener("click", (ev) => {
+  const btn = ev.target.closest(".delete-saved");
+  if (!btn) return;
+  deleteSharedSaved(btn.dataset.savedId);
 });
 document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => activateTab(t.dataset.tab)));
 
