@@ -7,6 +7,12 @@
       description: "このWebサービス内の各アプリを一覧から選べます。"
     },
     {
+      title: "GP業務管理",
+      short: "GP",
+      path: "/internal/gp",
+      description: "顧客・案件・社内共有メモを同じ画面で管理します。"
+    },
+    {
       title: "補助金ファインダー",
       short: "Find",
       path: "/",
