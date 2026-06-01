@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ニッチ補助金ファインダー</title>
+<script src="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/gridjs.umd.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/theme/mermaid.min.css">
+<style>
+  :root { color-scheme: light; --primary:#2b6cb0; --primary-d:#2c5282; --gray-50:#f7f9fc; --gray-100:#edf2f7; --gray-200:#e2e8f0; --gray-300:#cbd5e0; --gray-600:#4a5568; --gray-800:#2d3748; --red:#c53030; --red-bg:#fff5f5; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:0; font-family:-apple-system,"Segoe UI","Yu Gothic UI",sans-serif; background:#fff; color:#1a202c; }
+  header { padding:14px 20px; border-bottom:1px solid var(--gray-200); background:#fafbfc; }
+  header h1 { margin:0; font-size:18px; font-weight:700; }
+  header .sub { color:var(--gray-600); font-size:12px; margin-top:2px; }
+  main { width:100%; max-width:none; margin:0 auto; padding:20px; }
+  .filters { background:var(--gray-50); border:1px solid var(--gray-200); border-radius:10px; padding:16px; margin-bottom:16px; }
+  .filter-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:12px; }
+  label { display:block; font-size:11px; font-weight:600; color:var(--gray-600); margin-bottom:4px; }
+  select, input[type=text], input[type=number] { width:100%; padding:7px 9px; border:1px solid var(--gray-300); border-radius:6px; font-size:13px; background:#fff; color:#1a202c; }
+  select:disabled { background:var(--gray-100); color:#999; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+  button { padding:9px 16px; border:0; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; }
+  .btn-primary { background:var(--primary); color:#fff; }
+  .btn-primary:hover { background:var(--primary-d); }
+  .btn-primary:disabled { background:#a0aec0; cursor:not-allowed; }
+  .btn-secondary { background:var(--gray-200); color:var(--gray-800); }
+  .btn-secondary:hover { background:var(--gray-300); }
+  .btn-web { background:#2563eb; color:#fff; }
+  .btn-web:hover { filter:brightness(0.92); }
+  .btn-web.chatgpt { background:#15803d; }
+  .info { font-size:12px; color:var(--gray-600); margin:8px 0; }
+  .info b { color:#1a202c; }
+  .tabs { display:flex; border-bottom:2px solid var(--gray-200); margin-bottom:12px; }
+  .tab { padding:10px 16px; cursor:pointer; font-size:13px; font-weight:600; color:var(--gray-600); border-bottom:2px solid transparent; margin-bottom:-2px; }
+  .tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+  #status { font-size:12px; color:var(--gray-600); margin-top:8px; min-height:18px; }
+  #status.err { color:var(--red); }
+  .ai-output { background:#faf5ff; border:1px solid #e9d8fd; border-radius:8px; padding:12px; font-size:13px; line-height:1.7; white-space:pre-wrap; max-height:600px; overflow:auto; }
+  .empty { text-align:center; padding:40px; color:var(--gray-600); font-size:13px; }
+  .web-panel { background:#f8fafc; border:1px solid var(--gray-200); border-radius:8px; padding:14px; }
+  .web-panel h3 { margin:0 0 8px 0; font-size:15px; color:var(--gray-800); }
+  .prompt-box, .answer-box { width:100%; border:1px solid var(--gray-300); border-radius:6px; padding:10px; font-size:12px; line-height:1.6; font-family:Consolas,"Yu Gothic UI",monospace; background:#fff; color:#1a202c; }
+  .prompt-box { min-height:190px; }
+  .answer-box { min-height:180px; margin-top:8px; }
+  .manual-result { margin-top:12px; }
+  .gridjs-wrapper { font-size:13px; overflow-x:auto; scrollbar-width:none; }
+  .gridjs-wrapper::-webkit-scrollbar { height:0; }
+  #grid table.gridjs-table { width:max-content; min-width:1925px; table-layout:fixed; }
+  #grid th.gridjs-th, #grid td.gridjs-td { white-space:normal; overflow:visible; text-overflow:clip; line-height:1.45; word-break:break-word; }
+  #grid th.gridjs-th .gridjs-th-content { white-space:normal; overflow:visible; text-overflow:clip; }
+  #grid td.gridjs-td { vertical-align:top; }
+  .grid-floating-scroll { position:fixed; bottom:10px; height:24px; overflow-x:auto; overflow-y:hidden; z-index:1000; background:#fff; border:1px solid var(--gray-300); border-radius:6px; box-shadow:0 4px 14px rgba(15,23,42,.16); display:none; }
+  .grid-floating-scroll-inner { height:1px; }
+  .official-source-link { color:#2b6cb0; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+  .official-source-link:hover { color:#2c5282; }
+  .purpose-cell { color:#1a202c; font-weight:500; line-height:1.55; }
+  .muted-cell { color:#718096; font-size:12px; }
+  .due-soon { background:var(--red-bg); color:var(--red); padding:1px 6px; border-radius:4px; }
+  .footer { font-size:11px; color:var(--gray-600); margin-top:24px; padding-top:16px; border-top:1px solid var(--gray-200); }
+  .footer a { color:var(--primary); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ニッチ補助金ファインダー</h1>
+  <div class="sub">国・都道府県・市区町村の補助金/助成金/奨励金を検索。jグランツ公開API＋Web版AIで最新情報。</div>
+</header>
+
+<main>
+  <div class="filters">
+    <div class="filter-row">
+      <div>
+        <label>国</label>
+        <select id="f-country">
+          <option value="japan">日本</option>
+        </select>
+      </div>
+      <div>
+        <label>都道府県</label>
+        <select id="f-prefecture">
+          <option value="">（全国／未指定）</option>
+        </select>
+      </div>
+      <div>
+        <label>政令指定都市・中核市</label>
+        <select id="f-major-municipality" disabled>
+          <option value="">（都道府県を先に選択）</option>
+        </select>
+      </div>
+      <div>
+        <label>その他の全市町村</label>
+        <select id="f-other-municipality" disabled>
+          <option value="">（都道府県を先に選択）</option>
+        </select>
+      </div>
+      <div>
+        <label>キーワード</label>
+        <input id="f-keyword" type="text" placeholder="例: 販路開拓, 設備投資, 革">
+      </div>
+    </div>
+    <div class="filter-row">
+      <div>
+        <label>テーマ（ヒント）</label>
+        <select id="f-theme">
+          <option value="">指定なし</option>
+          <option value="販路開拓">販路開拓</option>
+          <option value="展示会出展">展示会出展</option>
+          <option value="設備投資">設備投資</option>
+          <option value="IT導入">IT導入・DX</option>
+          <option value="EC構築">EC構築</option>
+          <option value="創業">創業・スタートアップ</option>
+          <option value="事業承継">事業承継</option>
+          <option value="省エネ">省エネ・脱炭素</option>
+          <option value="海外展開">海外展開</option>
+          <option value="雇用">雇用・人材育成</option>
+          <option value="研究開発">研究開発</option>
+          <option value="観光">観光・インバウンド</option>
+        </select>
+      </div>
+      <div>
+        <label>業種（AI問い合わせ時）</label>
+        <input id="f-industry" type="text" placeholder="例: 革小物製造業">
+      </div>
+      <div>
+        <label>従業員数</label>
+        <input id="f-employees" type="number" placeholder="例: 2">
+      </div>
+      <div>
+        <label>事業者形態</label>
+        <select id="f-entity">
+          <option value="">指定なし</option>
+          <option value="個人事業主">個人事業主</option>
+          <option value="法人">法人</option>
+        </select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn-primary" id="btn-search">最新の補助金を検索（jグランツ）</button>
+      <button class="btn-web" id="btn-web-claude">Claudeで直接開く</button>
+      <button class="btn-web chatgpt" id="btn-web-chatgpt">ChatGPTで直接開く</button>
+      <button class="btn-secondary" id="btn-clear">条件クリア</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="jgrants">jグランツ検索結果</div>
+    <div class="tab" data-tab="ai">AI補完結果</div>
+  </div>
+
+  <div id="tab-jgrants" class="tab-content active">
+    <div id="grid"><div class="empty">「最新の補助金を検索」を押すと、jグランツ公開APIから受付中の制度を取得します。</div></div>
+  </div>
+
+  <div id="tab-ai" class="tab-content">
+    <div id="ai-result"><div class="empty">Claude / ChatGPT 用の質問文をローカルで作成し、クリップボードにコピーしてからWeb版を開きます。</div></div>
+  </div>
+
+  <div class="footer">
+    データ取得: <a href="https://www.jgrants-portal.go.jp/" target="_blank" rel="noopener">jグランツ公開API</a> ／
+    AI補完: Claude / ChatGPT のWeb版に送る質問文を生成（APIキー不要） ／
+    本アプリは niche-hojokin-finder スキルの実装版です。市区町村のニッチ制度は必ず公式URLで一次裏取りしてください。
+  </div>
+</main>
+
+<script>
+let REGIONS = null;
+let floatingGridScroll = null;
+let activeGridWrapper = null;
+let scrollSyncing = false;
+
+async function loadRegions() {
+  const r = await fetch("./data/municipality-groups.json");
+  REGIONS = await r.json();
+  const pref = document.getElementById("f-prefecture");
+  REGIONS.prefectures.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    opt.textContent = p.name;
+    opt.dataset.code = p.code;
+    pref.appendChild(opt);
+  });
+}
+
+function setMunicipalityPlaceholder(select, text, disabled=true) {
+  select.innerHTML = "";
+  const opt = document.createElement("option");
+  opt.value = "";
+  opt.textContent = text;
+  select.appendChild(opt);
+  select.disabled = disabled;
+}
+
+function fillMajorMunicipalities(select, municipalities) {
+  setMunicipalityPlaceholder(select, "（選択しない）", false);
+  if (!municipalities.length) {
+    setMunicipalityPlaceholder(select, "（該当なし）", true);
+    return;
+  }
+  municipalities.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.name;
+    opt.textContent = `${m.name}（${m.type}）`;
+    select.appendChild(opt);
+  });
+}
+
+function fillOtherMunicipalities(select, municipalities) {
+  setMunicipalityPlaceholder(select, "（選択しない）", false);
+  municipalities.forEach(m => {
+    const opt = document.createElement("option");
+    const name = typeof m === "string" ? m : m.name;
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  });
+}
+
+function onPrefChange() {
+  const prefName = document.getElementById("f-prefecture").value;
+  const major = document.getElementById("f-major-municipality");
+  const other = document.getElementById("f-other-municipality");
+  if (!prefName) {
+    setMunicipalityPlaceholder(major, "（都道府県を先に選択）", true);
+    setMunicipalityPlaceholder(other, "（都道府県を先に選択）", true);
+    return;
+  }
+  const pref = REGIONS.prefectures.find(p => p.name === prefName);
+  fillMajorMunicipalities(major, pref?.majorMunicipalities || []);
+  fillOtherMunicipalities(other, pref?.otherMunicipalities || []);
+}
+
+function getSelectedMunicipality() {
+  return document.getElementById("f-major-municipality").value ||
+         document.getElementById("f-other-municipality").value ||
+         "";
+}
+
+function syncMunicipalitySelection(kind) {
+  const major = document.getElementById("f-major-municipality");
+  const other = document.getElementById("f-other-municipality");
+  if (kind === "major" && major.value) other.value = "";
+  if (kind === "other" && other.value) major.value = "";
+}
+
+function setStatus(msg, isErr=false) {
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.classList.toggle("err", isErr);
+}
+
+function activateTab(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.toggle("active", c.id === `tab-${name}`));
+}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((d - today) / 86400000);
+}
+
+function fmtDate(s) {
+  if (!s) return "-";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  return d.toISOString().slice(0,10);
+}
+
+function fmtMoney(value) {
+  if (value === null || value === undefined || value === "") return "-";
+  const num = Number(String(value).replace(/,/g, ""));
+  if (!Number.isFinite(num)) return String(value);
+  return num.toLocaleString("ja-JP");
+}
+
+function fmtMoneyYen(value) {
+  const formatted = fmtMoney(value);
+  return formatted === "-" ? "-" : `${formatted}円`;
+}
+
+function fmtLowerLimitYen(value) {
+  return value === null || value === undefined || value === "" ? "0円（公式記載なし）" : fmtMoneyYen(value);
+}
+
+async function searchJgrants() {
+  const keyword = document.getElementById("f-keyword").value.trim() ||
+                  document.getElementById("f-theme").value.trim() ||
+                  "補助金";
+  const prefecture = document.getElementById("f-prefecture").value;
+  const btn = document.getElementById("btn-search");
+
+  btn.disabled = true;
+  setStatus(`jグランツAPIに問い合わせ中… (keyword="${keyword}", 都道府県="${prefecture || "全国"}")`);
+  activateTab("jgrants");
+
+  try {
+    const params = new URLSearchParams({ keyword, prefecture, acceptance: "1" });
+    const r = await fetch(`/api/search-jgrants?${params}`);
+    const data = await r.json();
+    if (!data.ok) throw new Error(data.error || "取得失敗");
+
+    const items = data.items || [];
+    renderJgrantsTable(items);
+    const muni = getSelectedMunicipality();
+    const note = muni ? `※ ${muni} に絞り込みたい場合はWeb版AIボタンも併用してください（市区町村独自制度はjグランツに載らないことが多い）。` : "";
+    setStatus(`${items.length} 件取得（受付中のみ）。${note}`);
+  } catch (e) {
+    setStatus(`取得失敗: ${e.message}。jグランツHPで手動検索: https://www.jgrants-portal.go.jp/subsidy/search?keyword=${encodeURIComponent(keyword)}`, true);
+    document.getElementById("grid").innerHTML = `<div class="empty">取得失敗: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderJgrantsTable(items) {
+  const container = document.getElementById("grid");
+  container.innerHTML = "";
+  if (items.length === 0) {
+    container.innerHTML = '<div class="empty">受付中の該当制度が見つかりませんでした。キーワードを変えてもう一度お試しください。</div>';
+    return;
+  }
+
+  const rows = items.map(it => {
+    const dEnd = daysUntil(it.acceptance_end);
+    const dLabel = dEnd === null ? "-" : (dEnd < 0 ? "超過" : `あと${dEnd}日`);
+    const title = it.subsidy_name || it.name || "-";
+    const titleCell = it.id
+      ? {
+          title,
+          id: it.id,
+          officialUrl: it.official_source_url || "",
+          officialHost: it.official_source_host || ""
+        }
+      : { title, id: "" };
+    return [
+      titleCell,
+      it.issuer || "-",
+      it.target_area || "-",
+      fmtDate(it.acceptance_end),
+      dLabel,
+      fmtLowerLimitYen(it.subsidy_min_limit),
+      fmtMoneyYen(it.subsidy_max_limit),
+      it.subsidy_rate || "詳細で確認",
+      it.use_purpose || "-",
+      it.front_subsidy_detail_page_url || it.detail_url || ""
+    ];
+  });
+
+  new gridjs.Grid({
+    columns: [
+      { name: "補助金名称", width: "380px", formatter: (cell) => {
+        const title = escapeHtml(cell?.title || cell || "-");
+        if (!cell?.id) return title;
+        const id = encodeURIComponent(cell.id);
+        const officialUrl = cell.officialUrl || "";
+        const href = officialUrl || `/api/official-source/${id}/redirect`;
+        const host = cell.officialHost ? `（${escapeHtml(cell.officialHost)}）` : "";
+        return gridjs.html(`<a class="official-source-link" href="${escapeHtml(href)}" target="_blank" rel="noopener" data-subsidy-id="${escapeHtml(cell.id)}" data-official-url="${escapeHtml(officialUrl)}" data-official-host="${escapeHtml(cell.officialHost || "")}" title="省庁（.go.jp）または地方公共団体（.lg.jp）の公式元URLが確認できた場合だけ開きます${host}">${title}</a>`);
+      }},
+      { name: "実施主体", width: "180px" },
+      { name: "対象地域", width: "140px" },
+      { name: "締切", width: "100px" },
+      { name: "残日数", width: "90px", formatter: (cell) => {
+        if (typeof cell === "string" && cell.startsWith("あと")) {
+          const m = cell.match(/あと(\d+)日/);
+          if (m && Number(m[1]) <= 14) return gridjs.html(`<span class="due-soon">${cell}</span>`);
+        }
+        if (cell === "超過") return gridjs.html(`<span style="color:#999;text-decoration:line-through">${cell}</span>`);
+        return cell;
+      }},
+      { name: "下限", width: "160px" },
+      { name: "上限", width: "135px" },
+      { name: "補助率詳細", width: "170px", formatter: (cell) => cell === "詳細で確認" ? gridjs.html(`<span class="muted-cell">${cell}</span>`) : cell },
+      { name: "用途概要", width: "430px", formatter: (cell) => cell && cell !== "-" ? gridjs.html(`<span class="purpose-cell">${escapeHtml(cell)}</span>`) : "-" },
+      { name: "詳細", width: "80px", formatter: (cell) => cell ? gridjs.html(`<a href="${escapeHtml(cell)}" target="_blank" rel="noopener" style="color:#2b6cb0">jグランツ↗</a>`) : "-" }
+    ],
+    data: rows,
+    sort: true,
+    search: true,
+    pagination: { limit: 25 },
+    style: {
+      th: { "background-color": "#f0f4f8", "color": "#1a202c", "font-weight": "600" },
+      td: { "padding": "6px 8px", "vertical-align": "top" }
+    }
+  }).render(container);
+  setTimeout(() => addHorizontalScrollControls(container), 0);
+  setTimeout(() => addHorizontalScrollControls(container), 300);
+}
+
+function addHorizontalScrollControls(container) {
+  const wrapper = container.querySelector(".gridjs-wrapper");
+  if (!wrapper) return;
+  activeGridWrapper = wrapper;
+  document.querySelectorAll(".grid-bottom-scroll").forEach(el => el.remove());
+
+  if (!floatingGridScroll) {
+    floatingGridScroll = document.createElement("div");
+    floatingGridScroll.className = "grid-floating-scroll";
+    floatingGridScroll.setAttribute("aria-label", "表を横にスクロール");
+    floatingGridScroll.innerHTML = '<div class="grid-floating-scroll-inner"></div>';
+    document.body.appendChild(floatingGridScroll);
+
+    floatingGridScroll.addEventListener("scroll", () => {
+      if (!activeGridWrapper || scrollSyncing) return;
+      scrollSyncing = true;
+      activeGridWrapper.scrollLeft = floatingGridScroll.scrollLeft;
+      scrollSyncing = false;
+    });
+    window.addEventListener("scroll", updateFloatingGridScroll, { passive: true });
+    window.addEventListener("resize", updateFloatingGridScroll);
+  }
+
+  wrapper.addEventListener("scroll", () => {
+    if (wrapper !== activeGridWrapper || !floatingGridScroll || scrollSyncing) return;
+    scrollSyncing = true;
+    floatingGridScroll.scrollLeft = wrapper.scrollLeft;
+    scrollSyncing = false;
+  });
+  updateFloatingGridScroll();
+}
+
+function updateFloatingGridScroll() {
+  if (!activeGridWrapper || !floatingGridScroll) return;
+  const rect = activeGridWrapper.getBoundingClientRect();
+  const isVisible = rect.bottom > 0 && rect.top < window.innerHeight && activeGridWrapper.scrollWidth > activeGridWrapper.clientWidth + 2;
+  floatingGridScroll.style.display = isVisible ? "block" : "none";
+  if (!isVisible) return;
+
+  const margin = 16;
+  const left = Math.max(margin, rect.left);
+  const right = Math.max(margin, window.innerWidth - rect.right);
+  floatingGridScroll.style.left = `${left}px`;
+  floatingGridScroll.style.right = `${right}px`;
+  floatingGridScroll.querySelector(".grid-floating-scroll-inner").style.width = `${activeGridWrapper.scrollWidth}px`;
+  floatingGridScroll.scrollLeft = activeGridWrapper.scrollLeft;
+}
+
+async function openOfficialSource(link) {
+  if (link.dataset.officialUrl) {
+    const host = link.dataset.officialHost || new URL(link.dataset.officialUrl).hostname;
+    setStatus(`確認済みの公式元を開きます（${host}）。`);
+    return;
+  }
+  const id = link.dataset.subsidyId;
+  if (!id) return;
+  setStatus("省庁・自治体の公式元URLを確認中です...");
+  try {
+    const r = await fetch(`/api/official-source/${encodeURIComponent(id)}`);
+    const data = await r.json();
+    if (!r.ok || !data.ok || !data.url) {
+      setStatus(data.error || "公式元URLを確認できませんでした。誤リンク防止のため開きません。", true);
+      return;
+    }
+    window.open(data.url, "_blank", "noopener");
+    setStatus(`確認済みの公式元を開きました（${data.host}）。`);
+  } catch (e) {
+    setStatus(`公式元URLの確認に失敗しました: ${e.message}`, true);
+  }
+}
+
+function addMonthsKeepingDay(date, months) {
+  const result = new Date(date.getFullYear(), date.getMonth() + months, date.getDate());
+  if (result.getDate() !== date.getDate()) {
+    return new Date(date.getFullYear(), date.getMonth() + months + 1, 0);
+  }
+  return result;
+}
+
+function formatJapaneseDate(date) {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+}
+
+function getAiSearchWindow(referenceDate = new Date()) {
+  const today = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate());
+  const from = addMonthsKeepingDay(today, 1);
+  const to = addMonthsKeepingDay(today, 2);
+  return {
+    todayLabel: formatJapaneseDate(today),
+    fromLabel: formatJapaneseDate(from),
+    toLabel: formatJapaneseDate(to)
+  };
+}
+
+function buildAiPrompt() {
+  const pref = document.getElementById("f-prefecture").value;
+  const muni = getSelectedMunicipality();
+  const theme = document.getElementById("f-theme").value;
+  const keyword = document.getElementById("f-keyword").value.trim();
+  const industry = document.getElementById("f-industry").value.trim();
+  const employees = document.getElementById("f-employees").value;
+  const entity = document.getElementById("f-entity").value;
+
+  const location = pref + (muni ? ` ${muni}` : "");
+  const searchWindow = getAiSearchWindow();
+  const lines = [
+    `あなたは日本の補助金・助成金・奨励金に詳しいリサーチャーです。`,
+    ``,
+    `【事業者属性】`,
+    `- 所在地：${location || "未指定"}`,
+    industry && `- 業種：${industry}`,
+    entity && `- 形態：${entity}`,
+    employees && `- 従業員数：${employees}名`,
+    (theme || keyword) && `- テーマ／キーワード：${[theme, keyword].filter(Boolean).join(" / ")}`,
+    ``,
+    `【質問】`,
+    `上記事業者が応募できる、特に **${muni || pref || "該当地域"} の独自制度** を中心に、現在公募中または公募予告されている補助金・助成金・奨励金を 5〜15 件挙げてください。市区町村独自のニッチ制度を優先的に。`,
+    ``,
+    `【優先検索条件】`,
+    `- 今日の日付は ${searchWindow.todayLabel} です。`,
+    `- ${searchWindow.fromLabel} から ${searchWindow.toLabel} までの間に「公募告知」「公募開始」「募集開始」「公募締切」「募集終了」「事前告知」のいずれかがある制度を最優先にしてください。`,
+    `- 上記期間に該当する制度を先に並べ、足りない場合のみ現在公募中・通年募集・公募予定の制度を補足してください。`,
+    ``,
+    `【返却形式】各制度につき：`,
+    `1. 制度名（正式名称）`,
+    `2. 実施主体`,
+    `3. 補助上限・補助率`,
+    `4. 告知日・公募開始日・公募締切日（上記優先期間に該当する日付を明記。なければ「通年」「予告」「日付不詳」）`,
+    `5. 公式URL（実在URLのみ。不明なら「URL不詳」と明記）`,
+    `6. 推薦理由（1〜2行）`,
+    ``,
+    `Webで確認可能な実在情報のみ。URLは捏造しないでください。`
+  ];
+  return lines.filter(Boolean).join("\n");
+}
+
+let currentPrompt = "";
+
+const WEB_AI = {
+  claude: {
+    name: "Claude",
+    supportsPrefill: true,
+    buildUrl: (prompt) => `https://claude.ai/new?q=${encodeURIComponent(prompt)}`
+  },
+  chatgpt: {
+    name: "ChatGPT",
+    supportsPrefill: true,
+    buildUrl: (prompt) => `https://chatgpt.com/?q=${encodeURIComponent(prompt)}`
+  }
+};
+
+async function copyPromptToClipboard(showStatus=true) {
+  currentPrompt = currentPrompt || buildAiPrompt();
+  try {
+    await navigator.clipboard.writeText(currentPrompt);
+    if (showStatus) setStatus("プロンプトをコピーしました。Web版AIの入力欄に貼り付けてください。");
+    return true;
+  } catch (e) {
+    if (showStatus) setStatus("自動コピーできませんでした。画面のプロンプト欄から手動でコピーしてください。", true);
+    return false;
+  }
+}
+
+function openWebAi(provider, prompt = currentPrompt || buildAiPrompt()) {
+  const target = WEB_AI[provider];
+  if (!target) return;
+  window.open(target.buildUrl(prompt), "_blank", "noopener");
+}
+
+async function launchWebAi(provider) {
+  const target = WEB_AI[provider];
+  if (!target) return;
+
+  currentPrompt = buildAiPrompt();
+  activateTab("ai");
+  const copyPromise = copyPromptToClipboard(false);
+  openWebAi(provider, currentPrompt);
+  const copied = await copyPromise;
+  renderWebAiPanel(provider, copied);
+  setStatus(`${target.name} Web版をプロンプト付きで開きました。警告が出た場合は内容を確認して続行してください。`, !copied);
+}
+
+function renderWebAiPanel(provider, copied) {
+  const target = WEB_AI[provider];
+  const copyMessage = copied
+    ? "プロンプトはクリップボードにコピー済みです。"
+    : "自動コピーできませんでした。下のプロンプト欄から手動でコピーしてください。";
+  const openMessage = "Web版AIはプロンプト付きURLで開きます。警告が出た場合は、表示された内容が補助金調査文だけであることを確認して続行してください。";
+
+  document.getElementById("ai-result").innerHTML = `
+    <div class="web-panel">
+      <h3>${target.name} Web版で使う</h3>
+      <div class="info"><b>${copyMessage}</b> ${openMessage}</div>
+      <textarea class="prompt-box" readonly>${escapeHtml(currentPrompt)}</textarea>
+      <div class="actions" style="margin:10px 0 14px 0">
+        <button class="btn-secondary" onclick="copyPromptToClipboard()">プロンプトを再コピー</button>
+        <button class="btn-secondary" onclick="openWebAi('${provider}')">${target.name}を再度開く</button>
+      </div>
+      <label>Web版AIの回答をここに貼り付け</label>
+      <textarea id="manual-answer" class="answer-box" placeholder="${target.name}の回答を貼り付けると、この画面で確認用に表示できます。"></textarea>
+      <div class="actions" style="margin-top:8px">
+        <button class="btn-primary" onclick="renderPastedAnswer()">貼り付けた回答を表示</button>
+      </div>
+      <div id="manual-rendered" class="manual-result"></div>
+      <div class="info" style="margin-top:12px">AIの回答には実在しないURL・制度が混じる可能性があります。必ず公式URLで一次裏取りしてください。</div>
+    </div>`;
+}
+
+function renderPastedAnswer() {
+  const text = document.getElementById("manual-answer")?.value || "";
+  const result = document.getElementById("manual-rendered");
+  if (!result) return;
+  if (!text.trim()) {
+    result.innerHTML = `<div class="empty" style="padding:18px">回答がまだ貼り付けられていません。</div>`;
+    return;
+  }
+  result.innerHTML = `<div class="ai-output">${escapeHtml(text)}</div>`;
+  setStatus("貼り付けた回答を表示しました。");
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c]);
+}
+
+document.getElementById("f-prefecture").addEventListener("change", onPrefChange);
+document.getElementById("f-major-municipality").addEventListener("change", () => syncMunicipalitySelection("major"));
+document.getElementById("f-other-municipality").addEventListener("change", () => syncMunicipalitySelection("other"));
+document.getElementById("btn-search").addEventListener("click", searchJgrants);
+document.getElementById("btn-web-claude").addEventListener("click", () => launchWebAi("claude"));
+document.getElementById("btn-web-chatgpt").addEventListener("click", () => launchWebAi("chatgpt"));
+document.getElementById("btn-clear").addEventListener("click", () => {
+  ["f-prefecture","f-major-municipality","f-other-municipality","f-keyword","f-theme","f-industry","f-employees","f-entity"].forEach(id => document.getElementById(id).value = "");
+  onPrefChange();
+  setStatus("条件をクリアしました");
+});
+document.getElementById("grid").addEventListener("click", (ev) => {
+  const link = ev.target.closest(".official-source-link");
+  if (!link) return;
+  if (link.dataset.officialUrl) {
+    openOfficialSource(link);
+    return;
+  }
+  ev.preventDefault();
+  openOfficialSource(link);
+});
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => activateTab(t.dataset.tab)));
+
+loadRegions().then(() => setStatus("準備完了。検索条件を入力して『最新の補助金を検索』を押してください。"));
+</script>
+</body>
+</html>

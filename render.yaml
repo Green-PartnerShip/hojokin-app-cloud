@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: niche-hojokin-finder
+    env: node
+    plan: starter
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLOUD_MODE
+        value: "1"
+      - key: PUBLIC_ACCESS
+        value: "1"
+      - key: AUTH_REQUIRED
+        value: "1"
+      - key: HOST
+        value: 0.0.0.0
+      - key: APP_USER
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true

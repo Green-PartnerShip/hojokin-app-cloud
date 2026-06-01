@@ -1,0 +1,67 @@
+{
+  "name": "niche-hojokin-finder-app",
+  "version": "1.2.0",
+  "description": "国・都道府県・市区町村の補助金・助成金・奨励金を検索し、Claude / ChatGPT Web向けの調査プロンプトを作るローカルアプリです。AI APIキーは使いません。",
+  "main": "main.cjs",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "start:local": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/launcher.ps1",
+    "start:web": "node server.js",
+    "build:win": "electron-builder --win",
+    "build:portable": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "electron": "^31.7.0",
+    "electron-builder": "^24.13.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "build": {
+    "appId": "local.niche-hojokin-finder",
+    "productName": "ニッチ補助金ファインダー",
+    "asar": true,
+    "files": [
+      "main.cjs",
+      "server.js",
+      "package.json",
+      "public/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".env.example",
+        "to": ".env.example"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": [
+        "ja_JP"
+      ]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+node_modules
+npm-debug.log
+dist
+backups
+.env
+*.bak*
+tools
+*.bat
+*.vbs
+README.md
