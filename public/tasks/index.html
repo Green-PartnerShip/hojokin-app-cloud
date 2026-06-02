@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#0f766e" />
     <title>業務タスクボード</title>
     <link rel="stylesheet" href="/app-switcher.css?v=20260602h" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260602i" />
     <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-    <script defer src="./app.js"></script>
+    <script defer src="./app.js?v=20260602i"></script>
   </head>
   <body>
     <section class="auth-overlay" id="authOverlay" hidden>
@@ -70,6 +70,23 @@
             <span>タスク追加</span>
           </button>
 
+          <section class="mode-panel" aria-label="保存先切り替え">
+            <div class="mode-panel-head">
+              <span>保存先</span>
+              <strong id="modeHint">社内共有</strong>
+            </div>
+            <div class="mode-switch" role="tablist" aria-label="保存先">
+              <button type="button" data-storage-mode="shared" aria-selected="true" data-help="社内共有モードです。タスクはRenderの共有DBへ保存され、同じパスワードで入った社員が確認できます。">
+                <i data-lucide="users"></i>
+                <span>社内共有</span>
+              </button>
+              <button type="button" data-storage-mode="private" aria-selected="false" data-help="自分だけモードです。このブラウザ内だけに保存し、社内共有DBへは送信しません。客先や個人メモ用のタスクを分けたいときに使います。">
+                <i data-lucide="lock"></i>
+                <span>自分だけ</span>
+              </button>
+            </div>
+          </section>
+
           <nav class="view-tabs" aria-label="表示切り替え">
             <button type="button" data-view="day" aria-selected="true" data-help="1日分を午前・午後・時間なしに分けて表示します。今日やる作業を集中して確認したいときに使います。">
               <i data-lucide="panel-top"></i>
@@ -111,6 +128,13 @@
                 <i data-lucide="search"></i>
                 <input id="searchInput" type="search" placeholder="タスク・案件・担当" autocomplete="off" data-help="タスク名、メモ、案件・顧客、担当、種類からキーワード検索します。入力すると表示中の一覧がすぐ絞り込まれます。" />
               </div>
+            </label>
+
+            <label>
+              <span>担当者</span>
+              <select id="ownerFilter" data-help="担当者名でカレンダー表示を絞り込みます。Googleカレンダーの個人別表示のように、自分・社員名・部署名ごとに予定を確認できます。">
+                <option value="all">全員</option>
+              </select>
             </label>
 
             <div class="filter-row">
@@ -196,7 +220,8 @@
           </label>
           <label>
             <span>担当</span>
-            <input id="taskOwner" name="owner" type="text" maxlength="40" placeholder="例: 自分" data-help="担当者を入力します。自分、チーム名、担当部署などを入れておくと、確認や検索がしやすくなります。" />
+            <input id="taskOwner" name="owner" type="text" maxlength="40" list="ownerSuggestions" placeholder="例: 山田 / 自分" data-help="担当者名を入力します。入力した名前はカレンダー上で色付き表示され、担当者フィルターから個人別に確認できます。" />
+            <datalist id="ownerSuggestions"></datalist>
           </label>
         </div>
 
@@ -271,7 +296,7 @@
 
         <section>
           <h3>基本の使い方</h3>
-          <p>この画面は、仕事のタスクを「今日やること」「今週の流れ」「月全体の予定」の3つの粒度で見られる業務用ボードです。タスクはブラウザ内に保存されるため、同じブラウザで開けば追加した内容が残ります。</p>
+          <p>この画面は、仕事のタスクを「今日やること」「今週の流れ」「月全体の予定」の3つの粒度で見られる業務用ボードです。保存先は「社内共有」と「自分だけ」を切り替えられます。</p>
           <p>まずは左の「タスク追加」から予定を登録します。重要なものは重要度を「最重要」または「高め」にしておくと、左側の重要案件欄とメインのカード上で目立ちます。</p>
         </section>
 
@@ -317,9 +342,15 @@
           <h3>検索と絞り込み</h3>
           <dl class="help-list">
             <div><dt>検索</dt><dd>タスク名、メモ、案件・顧客、担当、種類からキーワード検索できます。顧客名や担当者名で探すときに便利です。</dd></div>
+            <div><dt>担当者</dt><dd>担当者名で表示を絞り込みます。タスク追加時に名前を入力しておくと、Googleカレンダーの個人別表示のように、担当者ごとの予定だけを確認できます。</dd></div>
             <div><dt>状態</dt><dd>未完了、期限超過、今日、すべて、完了から表示対象を切り替えます。確認したい状態だけに絞り込めます。</dd></div>
             <div><dt>重要度</dt><dd>重要度ごとに表示を絞れます。最重要だけ、高めだけ、低めだけといった確認ができます。</dd></div>
           </dl>
+        </section>
+
+        <section>
+          <h3>保存先の切り替え</h3>
+          <p>「社内共有」はRenderの共有DBに保存され、社員が同じURLで確認できます。「自分だけ」はこのブラウザ内だけに保存され、社内共有DBへ送信されません。個人メモや客先で見せたくない予定は、自分だけモードで管理できます。</p>
         </section>
 
         <section>
@@ -334,7 +365,7 @@
 
         <section>
           <h3>起動と保存</h3>
-          <p>このアプリはローカルURLで動いています。起動ファイルから立ち上げると、サーバーが止まっている場合は自動で起動し、URLが開ける状態か確認してからブラウザを開きます。登録したタスクはブラウザ内に保存されます。</p>
+          <p>クラウド版はRender上で動きます。社内共有モードでは共有DBに保存され、自分だけモードでは今使っているブラウザ内に保存されます。</p>
         </section>
       </div>
     </dialog>

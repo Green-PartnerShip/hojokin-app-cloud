@@ -1,4 +1,7 @@
 const SYNC_INTERVAL_MS = 6000;
+const STORAGE_MODE_KEY = "gp-task-board-storage-mode";
+const LOCAL_TASKS_KEY = "gp-task-board-private-tasks";
+const OWNER_COLOR_COUNT = 6;
 const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
 const WEEKDAYS_FULL = ["日", "月", "火", "水", "木", "金", "土"];
 const PRIORITY_META = {
@@ -17,6 +20,9 @@ const elements = {
   searchInput: document.querySelector("#searchInput"),
   statusFilter: document.querySelector("#statusFilter"),
   priorityFilter: document.querySelector("#priorityFilter"),
+  ownerFilter: document.querySelector("#ownerFilter"),
+  ownerSuggestions: document.querySelector("#ownerSuggestions"),
+  modeHint: document.querySelector("#modeHint"),
   focusList: document.querySelector("#focusList"),
   upcomingList: document.querySelector("#upcomingList"),
   viewKicker: document.querySelector("#viewKicker"),
@@ -46,6 +52,8 @@ const state = {
   query: "",
   status: "active",
   priority: "all",
+  ownerFilter: "all",
+  storageMode: readSavedStorageMode(),
   editingId: null,
   authenticated: false,
   lastUpdatedAt: null,
@@ -88,6 +96,46 @@ function setAuthMessage(message = "") {
   elements.authMessage.textContent = message;
 }
 
+function readSavedStorageMode() {
+  return localStorage.getItem(STORAGE_MODE_KEY) === "private" ? "private" : "shared";
+}
+
+function isPrivateMode() {
+  return state.storageMode === "private";
+}
+
+function readLocalStore() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LOCAL_TASKS_KEY) || "{}");
+    return {
+      tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map(normalizeTask) : [],
+      updatedAt: parsed.updatedAt || null,
+    };
+  } catch {
+    return { tasks: [], updatedAt: null };
+  }
+}
+
+function writeLocalStore() {
+  const updatedAt = new Date().toISOString();
+  localStorage.setItem(
+    LOCAL_TASKS_KEY,
+    JSON.stringify({
+      tasks: state.tasks,
+      updatedAt,
+    }),
+  );
+  state.lastUpdatedAt = updatedAt;
+}
+
+function loadTasksFromLocal() {
+  const store = readLocalStore();
+  state.tasks = store.tasks;
+  state.lastUpdatedAt = store.updatedAt;
+  render();
+  setSyncStatus("自分だけ保存", "muted");
+}
+
 function showLogin(message = "") {
   state.authenticated = false;
   stopSync();
@@ -112,6 +160,14 @@ function applyServerStore(store) {
   state.tasks = Array.isArray(store.tasks) ? store.tasks.map(normalizeTask) : [];
   state.lastUpdatedAt = store.updatedAt || null;
   render();
+}
+
+function updateStorageModeControls() {
+  document.querySelectorAll("[data-storage-mode]").forEach((button) => {
+    const selected = button.dataset.storageMode === state.storageMode;
+    button.setAttribute("aria-selected", String(selected));
+  });
+  elements.modeHint.textContent = isPrivateMode() ? "自分だけ" : "社内共有";
 }
 
 async function apiRequest(path, options = {}) {
@@ -145,10 +201,21 @@ async function loadTasksFromServer({ quiet = false } = {}) {
   setSyncStatus("同期済み");
 }
 
+async function loadTasks({ quiet = false } = {}) {
+  if (isPrivateMode()) {
+    loadTasksFromLocal();
+    return;
+  }
+  await loadTasksFromServer({ quiet });
+}
+
 function startSync() {
   stopSync();
+  if (isPrivateMode()) {
+    return;
+  }
   syncTimer = window.setInterval(() => {
-    if (!state.authenticated || document.hidden) {
+    if (!state.authenticated || document.hidden || isPrivateMode()) {
       return;
     }
     loadTasksFromServer({ quiet: true }).catch(() => {
@@ -172,7 +239,7 @@ async function loginWithPassword(password) {
     body: { password },
   });
   showApp();
-  await loadTasksFromServer();
+  await loadTasks();
   startSync();
 }
 
@@ -191,16 +258,58 @@ async function saveTaskToServer(taskData) {
   setSyncStatus("保存済み");
 }
 
+async function saveTask(taskData) {
+  if (!isPrivateMode()) {
+    await saveTaskToServer(taskData);
+    return;
+  }
+
+  if (state.editingId) {
+    state.tasks = state.tasks.map((task) =>
+      task.id === state.editingId
+        ? normalizeTask({ ...task, ...taskData, id: task.id, createdAt: task.createdAt })
+        : task,
+    );
+  } else {
+    state.tasks = [...state.tasks, normalizeTask({ ...taskData, id: createId(), createdAt: Date.now() })];
+  }
+  writeLocalStore();
+  render();
+  setSyncStatus("自分だけ保存済み", "muted");
+}
+
 async function deleteTaskFromServer(id) {
   const store = await apiRequest(`/api/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
   applyServerStore(store);
   setSyncStatus("削除済み");
 }
 
+async function deleteTask(id) {
+  if (!isPrivateMode()) {
+    await deleteTaskFromServer(id);
+    return;
+  }
+  state.tasks = state.tasks.filter((task) => task.id !== id);
+  writeLocalStore();
+  render();
+  setSyncStatus("自分だけ削除済み", "muted");
+}
+
 async function toggleTaskDoneOnServer(id) {
   const store = await apiRequest(`/api/tasks/${encodeURIComponent(id)}/toggle`, { method: "POST" });
   applyServerStore(store);
   setSyncStatus("同期済み");
+}
+
+async function toggleTaskDone(id) {
+  if (!isPrivateMode()) {
+    await toggleTaskDoneOnServer(id);
+    return;
+  }
+  state.tasks = state.tasks.map((task) => (task.id === id ? { ...task, done: !task.done } : task));
+  writeLocalStore();
+  render();
+  setSyncStatus("自分だけ保存済み", "muted");
 }
 
 function sampleTasks() {
@@ -353,6 +462,7 @@ function filteredTasks() {
   return state.tasks.filter((task) => {
     const querySource = `${task.title} ${task.notes} ${task.category} ${task.project} ${task.owner}`.toLowerCase();
     const queryMatch = !query || querySource.includes(query);
+    const ownerMatch = state.ownerFilter === "all" || task.owner === state.ownerFilter;
     const priorityMatch = state.priority === "all" || task.priority === state.priority;
     const statusMatch =
       state.status === "all" ||
@@ -360,7 +470,7 @@ function filteredTasks() {
       (state.status === "active" && !task.done) ||
       (state.status === "overdue" && isOverdue(task)) ||
       (state.status === "today" && isDueToday(task));
-    return queryMatch && priorityMatch && statusMatch;
+    return queryMatch && ownerMatch && priorityMatch && statusMatch;
   });
 }
 
@@ -408,6 +518,8 @@ function visibleRange() {
 }
 
 function render() {
+  updateStorageModeControls();
+  renderOwnerControls();
   updateViewTabs();
   updateHeader();
   updateStats();
@@ -416,6 +528,32 @@ function render() {
   renderUpcoming();
   renderCalendar();
   decorateIcons();
+}
+
+function uniqueOwners() {
+  return [...new Set(state.tasks.map((task) => task.owner.trim()).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "ja"),
+  );
+}
+
+function ownerScopedTasks() {
+  if (state.ownerFilter === "all") {
+    return state.tasks;
+  }
+  return state.tasks.filter((task) => task.owner === state.ownerFilter);
+}
+
+function renderOwnerControls() {
+  const owners = uniqueOwners();
+  if (state.ownerFilter !== "all" && !owners.includes(state.ownerFilter)) {
+    state.ownerFilter = "all";
+  }
+  elements.ownerFilter.innerHTML = [
+    `<option value="all">全員</option>`,
+    ...owners.map((owner) => `<option value="${escapeHtml(owner)}">${escapeHtml(owner)}</option>`),
+  ].join("");
+  elements.ownerFilter.value = state.ownerFilter;
+  elements.ownerSuggestions.innerHTML = owners.map((owner) => `<option value="${escapeHtml(owner)}"></option>`).join("");
 }
 
 function decorateIcons() {
@@ -437,32 +575,35 @@ function updateHeader() {
     week: "1週間",
     month: "1か月",
   };
+  const storageLabel = isPrivateMode() ? "自分だけ" : "社内共有";
+  const ownerLabel = state.ownerFilter === "all" ? "" : ` / ${state.ownerFilter}`;
   elements.viewKicker.textContent = labels[state.view];
 
   if (state.view === "day") {
     const label = formatDate(state.anchorDate, { year: true });
     elements.viewTitle.textContent = label;
-    elements.scopeLabel.textContent = `${label}の業務`;
+    elements.scopeLabel.textContent = `${storageLabel}${ownerLabel} - ${label}`;
     return;
   }
 
   if (state.view === "week") {
     const title = `${formatDate(start)} - ${formatDate(end)}`;
     elements.viewTitle.textContent = title;
-    elements.scopeLabel.textContent = "週の業務";
+    elements.scopeLabel.textContent = `${storageLabel}${ownerLabel} - 週の業務`;
     return;
   }
 
   const monthTitle = `${state.anchorDate.getFullYear()}年${state.anchorDate.getMonth() + 1}月`;
   elements.viewTitle.textContent = monthTitle;
-  elements.scopeLabel.textContent = "月の業務";
+  elements.scopeLabel.textContent = `${storageLabel}${ownerLabel} - 月の業務`;
 }
 
 function updateStats() {
   const today = startOfDay(new Date());
-  const activeTasks = state.tasks.filter((task) => !task.done);
-  const completed = state.tasks.filter((task) => task.done).length;
-  const doneRate = state.tasks.length ? Math.round((completed / state.tasks.length) * 100) : 0;
+  const scopedTasks = ownerScopedTasks();
+  const activeTasks = scopedTasks.filter((task) => !task.done);
+  const completed = scopedTasks.filter((task) => task.done).length;
+  const doneRate = scopedTasks.length ? Math.round((completed / scopedTasks.length) * 100) : 0;
 
   elements.criticalCount.textContent = activeTasks.filter((task) => task.priority === "critical").length;
   elements.overdueCount.textContent = activeTasks.filter(isOverdue).length;
@@ -473,7 +614,7 @@ function updateStats() {
 function renderWorkSummary() {
   const today = startOfDay(new Date());
   const weekEnd = addDays(today, 6);
-  const activeTasks = state.tasks.filter((task) => !task.done);
+  const activeTasks = ownerScopedTasks().filter((task) => !task.done);
   const tiles = [
     {
       label: "最重要",
@@ -546,6 +687,21 @@ function attentionWeight(task) {
   return 4;
 }
 
+function ownerColorIndex(owner) {
+  if (!owner) {
+    return 0;
+  }
+  let hash = 0;
+  for (const char of owner) {
+    hash = (hash * 31 + char.charCodeAt(0)) % 9973;
+  }
+  return hash % OWNER_COLOR_COUNT;
+}
+
+function ownerColorClass(owner) {
+  return owner ? `owner-color-${ownerColorIndex(owner)}` : "";
+}
+
 function renderUpcoming() {
   const today = toYmd(new Date());
   const nextTasks = filteredTasks()
@@ -567,6 +723,7 @@ function renderMiniTask(task) {
   const meta = [
     formatCompactDate(task.date),
     task.time || "時間なし",
+    task.owner || "",
     task.project || task.category,
   ].filter(Boolean);
 
@@ -721,7 +878,7 @@ function renderMonthCell(day) {
 function renderMonthChip(task) {
   const priority = PRIORITY_META[task.priority];
   return `
-    <button class="month-chip priority-${task.priority} ${task.done ? "is-done" : ""}" type="button" data-action="edit" data-id="${task.id}" data-help="この月表示のタスクを編集します。最重要タスクは赤系で表示され、月内でも見つけやすくなっています。">
+    <button class="month-chip priority-${task.priority} ${ownerColorClass(task.owner)} ${task.done ? "is-done" : ""}" type="button" data-action="edit" data-id="${task.id}" data-help="この月表示のタスクを編集します。最重要タスクは赤系で表示され、月内でも見つけやすくなっています。">
       <i data-lucide="${task.done ? "check-circle-2" : priority.icon}"></i>
       <span>${escapeHtml(task.title)}</span>
     </button>
@@ -732,7 +889,7 @@ function renderTaskCard(task) {
   const priority = PRIORITY_META[task.priority];
   const dueClass = isOverdue(task) ? "is-overdue" : isDueToday(task) ? "is-today" : "";
   return `
-    <article class="task-card priority-${task.priority} ${dueClass} ${task.done ? "is-done" : ""}">
+    <article class="task-card priority-${task.priority} ${ownerColorClass(task.owner)} ${dueClass} ${task.done ? "is-done" : ""}">
       <button class="check-button" type="button" data-action="toggle-done" data-id="${task.id}" aria-label="完了を切り替え" data-help="このタスクの完了/未完了を切り替えます。完了にするとカードが薄くなり、完了率に反映されます。">
         <i data-lucide="${task.done ? "check-circle-2" : "circle"}"></i>
       </button>
@@ -747,7 +904,7 @@ function renderTaskCard(task) {
         <div class="task-meta">
           ${task.time ? `<span>${task.time}</span>` : `<span>時間なし</span>`}
           ${task.project ? `<span class="pill project">${escapeHtml(task.project)}</span>` : ""}
-          ${task.owner ? `<span class="pill owner">${escapeHtml(task.owner)}</span>` : ""}
+          ${task.owner ? `<span class="pill owner ${ownerColorClass(task.owner)}">${escapeHtml(task.owner)}</span>` : ""}
           <span class="pill">${escapeHtml(task.category)}</span>
           <span class="pill priority-${task.priority}">${priority.label}</span>
         </div>
@@ -809,7 +966,9 @@ function setSelectValue(select, value) {
 }
 
 function closeTaskDialog() {
-  elements.dialog.close();
+  if (elements.dialog.open) {
+    elements.dialog.close();
+  }
   state.editingId = null;
 }
 
@@ -848,7 +1007,7 @@ async function handleSubmit(event) {
   submitButton.disabled = true;
   setSyncStatus("保存中", "muted");
   try {
-    await saveTaskToServer(taskData);
+    await saveTask(taskData);
     closeTaskDialog();
   } catch (error) {
     setSyncStatus("保存失敗", "error");
@@ -865,7 +1024,7 @@ async function deleteCurrentTask() {
   elements.deleteTaskButton.disabled = true;
   setSyncStatus("削除中", "muted");
   try {
-    await deleteTaskFromServer(state.editingId);
+    await deleteTask(state.editingId);
     closeTaskDialog();
   } catch (error) {
     setSyncStatus("削除失敗", "error");
@@ -965,7 +1124,7 @@ document.addEventListener("click", async (event) => {
     actionTarget.disabled = true;
     setSyncStatus("同期中", "muted");
     try {
-      await toggleTaskDoneOnServer(id);
+      await toggleTaskDone(id);
     } catch (error) {
       setSyncStatus("同期失敗", "error");
       alert(error.message || "更新できませんでした。");
@@ -990,6 +1149,29 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+document.addEventListener("click", async (event) => {
+  const modeTarget = event.target.closest("[data-storage-mode]");
+  if (!modeTarget) {
+    return;
+  }
+  const nextMode = modeTarget.dataset.storageMode === "private" ? "private" : "shared";
+  if (nextMode === state.storageMode) {
+    return;
+  }
+  state.storageMode = nextMode;
+  state.editingId = null;
+  localStorage.setItem(STORAGE_MODE_KEY, nextMode);
+  closeTaskDialog();
+  setSyncStatus(nextMode === "private" ? "自分だけ読込中" : "社内共有読込中", "muted");
+  try {
+    await loadTasks();
+    startSync();
+  } catch (error) {
+    setSyncStatus("切替失敗", "error");
+    alert(error.message || "保存先を切り替えられませんでした。");
+  }
+});
+
 document.addEventListener("click", (event) => {
   const viewTarget = event.target.closest("[data-view]");
   if (!viewTarget) {
@@ -1011,6 +1193,11 @@ elements.statusFilter.addEventListener("change", (event) => {
 
 elements.priorityFilter.addEventListener("change", (event) => {
   state.priority = event.target.value;
+  render();
+});
+
+elements.ownerFilter.addEventListener("change", (event) => {
+  state.ownerFilter = event.target.value;
   render();
 });
 
@@ -1094,7 +1281,7 @@ document.addEventListener("scroll", hideQuickHelp, true);
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && state.authenticated) {
-    loadTasksFromServer({ quiet: true }).catch(() => setSyncStatus("同期失敗", "error"));
+    loadTasks({ quiet: true }).catch(() => setSyncStatus("同期失敗", "error"));
   }
 });
 
@@ -1113,7 +1300,7 @@ async function initializeApp() {
       return;
     }
     showApp();
-    await loadTasksFromServer();
+    await loadTasks();
     startSync();
   } catch (error) {
     showLogin(error.message || "接続できませんでした。");

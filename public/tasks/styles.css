@@ -348,6 +348,52 @@ textarea:focus-visible {
   box-shadow: 0 6px 14px rgba(31, 39, 42, 0.08);
 }
 
+.mode-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.mode-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.mode-panel-head strong {
+  color: var(--teal);
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mode-switch button {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.mode-switch button[aria-selected="true"] {
+  border-color: #b8d9d2;
+  background: var(--surface);
+  color: var(--teal);
+  box-shadow: 0 6px 14px rgba(31, 39, 42, 0.08);
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -719,6 +765,15 @@ textarea:focus,
   border-left-color: var(--amber);
 }
 
+.task-card.owner-color-0,
+.task-card.owner-color-1,
+.task-card.owner-color-2,
+.task-card.owner-color-3,
+.task-card.owner-color-4,
+.task-card.owner-color-5 {
+  border-right: 4px solid var(--owner-color);
+}
+
 .task-card.is-overdue {
   outline: 2px solid rgba(180, 35, 24, 0.14);
 }
@@ -826,8 +881,48 @@ textarea:focus,
 }
 
 .pill.owner {
-  background: var(--blue-soft);
-  color: #1e4fc2;
+  background: var(--owner-soft, var(--blue-soft));
+  color: var(--owner-color, #1e4fc2);
+  font-weight: 800;
+}
+
+.owner-color-0 {
+  --owner-color: #2563eb;
+  --owner-soft: #dbeafe;
+}
+
+.owner-color-1 {
+  --owner-color: #0f766e;
+  --owner-soft: #ccfbf1;
+}
+
+.owner-color-2 {
+  --owner-color: #9333ea;
+  --owner-soft: #f3e8ff;
+}
+
+.owner-color-3 {
+  --owner-color: #c2410c;
+  --owner-soft: #ffedd5;
+}
+
+.owner-color-4 {
+  --owner-color: #be123c;
+  --owner-soft: #ffe4e6;
+}
+
+.owner-color-5 {
+  --owner-color: #047857;
+  --owner-soft: #d1fae5;
+}
+
+.month-chip.owner-color-0,
+.month-chip.owner-color-1,
+.month-chip.owner-color-2,
+.month-chip.owner-color-3,
+.month-chip.owner-color-4,
+.month-chip.owner-color-5 {
+  border-left: 3px solid var(--owner-color);
 }
 
 .pill.priority-critical {
