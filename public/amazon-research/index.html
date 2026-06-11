@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f766e">
+  <title>Amazon ECリサーチ - 補助金クラウド</title>
+  <link rel="stylesheet" href="/app-switcher.css?v=20260611a">
+  <link rel="stylesheet" href="./styles.css?v=20260611b">
+  <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script defer src="/app-switcher.js?v=20260611a"></script>
+  <script defer src="./app.js?v=20260611a"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">EC</div>
+      <div>
+        <p class="brand-kicker">GREEN PARTNERSHIP</p>
+        <h1>Amazon ECリサーチ</h1>
+      </div>
+    </div>
+
+    <nav class="top-actions" aria-label="操作">
+      <a class="tool-button" href="/internal" data-tip="統合メニューへ戻り、他の社内アプリを開きます。">
+        <i data-lucide="layout-dashboard" aria-hidden="true"></i>
+        <span>メニュー</span>
+      </a>
+      <button id="sampleButton" class="tool-button" type="button" data-tip="サンプル値を読み込み、スコア計算や保存の流れを確認します。">
+        <i data-lucide="sparkles" aria-hidden="true"></i>
+        <span>サンプル</span>
+      </button>
+      <button id="newButton" class="tool-button" type="button" data-tip="新しい商品候補の調査を開始します。共有保存済みデータは消えません。">
+        <i data-lucide="file-plus" aria-hidden="true"></i>
+        <span>新規</span>
+      </button>
+      <button id="saveButton" class="tool-button primary" type="button" data-tip="現在の入力内容を社内共有データとして保存します。">
+        <i data-lucide="database" aria-hidden="true"></i>
+        <span>共有保存</span>
+      </button>
+      <button id="loadButton" class="tool-button" type="button" data-tip="社内共有で保存済みの商品リサーチ案件を一覧から開きます。">
+        <i data-lucide="folder-open" aria-hidden="true"></i>
+        <span>共有一覧</span>
+      </button>
+      <button id="copyButton" class="tool-button" type="button" data-tip="判定サマリーをクリップボードへコピーします。">
+        <i data-lucide="copy" aria-hidden="true"></i>
+        <span>要約コピー</span>
+      </button>
+      <button id="exportButton" class="tool-button" type="button" data-tip="商品条件、競合、キーワード、チェック項目をCSVとして保存します。">
+        <i data-lucide="file-down" aria-hidden="true"></i>
+        <span>CSV</span>
+      </button>
+      <button id="printButton" class="tool-button" type="button" data-tip="調査結果を印刷、またはPDF保存します。">
+        <i data-lucide="printer" aria-hidden="true"></i>
+        <span>印刷</span>
+      </button>
+      <a class="tool-button" href="/logout" data-tip="共有画面からログアウトします。共用端末で使った後に押してください。">
+        <i data-lucide="log-out" aria-hidden="true"></i>
+        <span>ログアウト</span>
+      </a>
+    </nav>
+  </header>
+
+  <main class="app-shell">
+    <aside class="score-pane" aria-label="総合判定">
+      <div class="score-card">
+        <div class="score-head">
+          <div>
+            <p class="eyebrow">総合スコア</p>
+            <strong id="totalScore">0</strong>
+          </div>
+          <span id="decisionLabel" class="decision">入力待ち</span>
+        </div>
+        <p id="saveStatus" class="save-status">未保存</p>
+
+        <div class="score-bars">
+          <div class="bar-row" data-tip="月間販売数とキーワード検索数から、市場の大きさを見ます。" tabindex="0">
+            <div><span>需要</span><b id="demandScoreText">0</b></div>
+            <span class="bar"><i id="demandBar"></i></span>
+          </div>
+          <div class="bar-row" data-tip="利益率、ROI、月間利益のバランスを見ます。" tabindex="0">
+            <div><span>利益性</span><b id="profitScoreText">0</b></div>
+            <span class="bar profit"><i id="profitBar"></i></span>
+          </div>
+          <div class="bar-row" data-tip="競合レビュー数、広告競争、順位難易度から入りやすさを見ます。" tabindex="0">
+            <div><span>競合余地</span><b id="competitionScoreText">0</b></div>
+            <span class="bar competition"><i id="competitionBar"></i></span>
+          </div>
+          <div class="bar-row" data-tip="規制、FBA、仕入れ、品質、資金繰りの確認状況を見ます。" tabindex="0">
+            <div><span>リスク確認</span><b id="riskScoreText">0</b></div>
+            <span class="bar risk"><i id="riskBar"></i></span>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric" data-tip="販売価格から各種コストを引いた1個あたり利益です。" tabindex="0">
+            <span>1個利益</span>
+            <strong id="profitUnit">0円</strong>
+          </div>
+          <div class="metric" data-tip="販売価格に対して利益が何%残るかを表示します。" tabindex="0">
+            <span>利益率</span>
+            <strong id="marginPct">0%</strong>
+          </div>
+          <div class="metric" data-tip="仕入れ関連コストに対する利益の割合です。" tabindex="0">
+            <span>ROI</span>
+            <strong id="roiPct">0%</strong>
+          </div>
+          <div class="metric" data-tip="想定販売数を売った時の月間利益です。" tabindex="0">
+            <span>月間利益</span>
+            <strong id="monthlyProfit">0円</strong>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="work-pane" aria-label="リサーチ入力">
+      <nav class="tabs" aria-label="リサーチ項目">
+        <button class="tab active" type="button" data-tab="product" data-tip="商品候補の基本条件を入力します。">商品</button>
+        <button class="tab" type="button" data-tab="competitors" data-tip="Amazon上の競合商品を比較します。">競合</button>
+        <button class="tab" type="button" data-tab="keywords" data-tip="検索需要と広告競争を整理します。">キーワード</button>
+        <button class="tab" type="button" data-tab="profit" data-tip="FBA前提の損益を確認します。">利益</button>
+        <button class="tab" type="button" data-tab="judge" data-tip="参入判断、リスク、次の打ち手をまとめます。">判定</button>
+      </nav>
+
+      <section id="pane-product" class="pane active" aria-label="商品条件">
+        <div class="section-block">
+          <h2>商品候補</h2>
+          <div class="form-grid">
+            <label>商品名 <span data-tip="社内で識別しやすい仮名で問題ありません。" tabindex="0">?</span><input data-bind="name" placeholder="例: 折りたたみ収納ボックス"></label>
+            <label>カテゴリ <span data-tip="Amazon上のメインカテゴリを入力します。" tabindex="0">?</span><input data-bind="category" placeholder="例: ホーム&キッチン"></label>
+            <label>ASIN/URL <span data-tip="類似品のASINや調査対象URLを控えます。" tabindex="0">?</span><input data-bind="asin" placeholder="例: B0XXXXXXX"></label>
+            <label>調査段階 <span data-tip="案件の現在地を選びます。" tabindex="0">?</span>
+              <select data-bind="stage">
+                <option>アイデア</option>
+                <option>一次調査</option>
+                <option>見積中</option>
+                <option>テスト発注候補</option>
+                <option>保留</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="section-block">
+          <h2>販売・仕入れ条件</h2>
+          <div class="form-grid">
+            <label>想定販売価格 <span data-tip="Amazonでの税込販売価格を円で入力します。" tabindex="0">?</span><input data-bind="price" type="number" min="0" step="10"></label>
+            <label>月間販売数 <span data-tip="Keepa、広告データなどから推定した月間販売数です。" tabindex="0">?</span><input data-bind="monthlyUnits" type="number" min="0" step="1"></label>
+            <label>仕入単価 <span data-tip="商品1個あたりの仕入れ価格です。" tabindex="0">?</span><input data-bind="cogs" type="number" min="0" step="10"></label>
+            <label>国内外送料 <span data-tip="工場からFBA納品までの輸送・通関・倉庫費用を1個あたりで入れます。" tabindex="0">?</span><input data-bind="inboundCost" type="number" min="0" step="10"></label>
+            <label>FBA/配送費 <span data-tip="FBA料金シミュレーター等で確認した配送代行費です。" tabindex="0">?</span><input data-bind="fbaFee" type="number" min="0" step="10"></label>
+            <label>販売手数料率 <span data-tip="カテゴリ別のAmazon販売手数料率を%で入力します。" tabindex="0">?</span><input data-bind="referralRate" type="number" min="0" max="60" step="0.1"></label>
+            <label>広告費率 <span data-tip="想定ACOSです。広告を使わない場合は0にします。" tabindex="0">?</span><input data-bind="acos" type="number" min="0" max="100" step="0.1"></label>
+            <label>返品・値引率 <span data-tip="返品、クーポン、セール値引きの想定負担を売上比率で入れます。" tabindex="0">?</span><input data-bind="returnRate" type="number" min="0" max="100" step="0.1"></label>
+            <label>その他原価 <span data-tip="検品、JAN、同梱物、保証対応、関税などを1個あたりで入れます。" tabindex="0">?</span><input data-bind="otherCost" type="number" min="0" step="10"></label>
+            <label>想定CVR <span data-tip="クリックから購入に至る想定率です。上限CPCの目安に使います。" tabindex="0">?</span><input data-bind="conversionRate" type="number" min="0" max="100" step="0.1"></label>
+            <label>調達リードタイム <span data-tip="発注からFBA納品までの日数です。" tabindex="0">?</span><input data-bind="leadTime" type="number" min="0" step="1"></label>
+            <label>MOQ <span data-tip="仕入先の最小発注数量です。テストしやすさの目安にします。" tabindex="0">?</span><input data-bind="moq" type="number" min="0" step="1"></label>
+          </div>
+        </div>
+
+        <div class="section-block">
+          <h2>差別化とメモ</h2>
+          <div class="form-grid two">
+            <label>差別化案 <span data-tip="サイズ、素材、セット内容、保証、写真訴求などを記録します。" tabindex="0">?</span><textarea data-bind="differentiation" placeholder="競合より良くできる点"></textarea></label>
+            <label>調査メモ <span data-tip="データ元、気づき、未確認事項を短く残します。" tabindex="0">?</span><textarea data-bind="researchNote" placeholder="例: 低評価は耐久性に集中"></textarea></label>
+          </div>
+        </div>
+      </section>
+
+      <section id="pane-competitors" class="pane" aria-label="競合比較">
+        <div class="table-head">
+          <div>
+            <h2>競合比較</h2>
+            <p>公開情報や自社で取得した正規データを入力してください。</p>
+          </div>
+          <button id="addCompetitorButton" class="tool-button primary" type="button" data-tip="競合商品を1行追加します。"><i data-lucide="plus" aria-hidden="true"></i><span>行を追加</span></button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ASIN/商品名</th><th>ブランド</th><th>価格</th><th>レビュー数</th><th>評価</th><th>月販推定</th><th>強み</th><th>弱み</th><th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="competitorRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="pane-keywords" class="pane" aria-label="キーワード需要">
+        <div class="table-head">
+          <div>
+            <h2>キーワード需要</h2>
+            <p>検索ボリュームは外部ツールや広告管理画面の概算値で問題ありません。</p>
+          </div>
+          <button id="addKeywordButton" class="tool-button primary" type="button" data-tip="検索語句を1行追加します。"><i data-lucide="plus" aria-hidden="true"></i><span>行を追加</span></button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>キーワード</th><th>月間検索数</th><th>想定CVR</th><th>広告競争</th><th>順位難易度</th><th>メモ</th><th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="keywordRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="pane-profit" class="pane" aria-label="損益">
+        <div class="section-block">
+          <h2>損益シミュレーション</h2>
+          <div class="metric-grid wide">
+            <div class="metric"><span>1個あたり利益</span><strong id="profitUnitDetail">0円</strong></div>
+            <div class="metric"><span>月間売上</span><strong id="monthlyRevenue">0円</strong></div>
+            <div class="metric"><span>損益分岐価格</span><strong id="breakEvenPrice">0円</strong></div>
+            <div class="metric"><span>上限CPC目安</span><strong id="maxCpc">0円</strong></div>
+          </div>
+        </div>
+        <div class="section-block">
+          <h2>原価内訳</h2>
+          <ul id="costBreakdown" class="status-list"></ul>
+        </div>
+      </section>
+
+      <section id="pane-judge" class="pane" aria-label="判定">
+        <div class="section-block">
+          <h2>参入前チェック</h2>
+          <div id="checkGrid" class="check-grid"></div>
+        </div>
+        <div class="section-block">
+          <h2>リスクと次の打ち手</h2>
+          <ul id="riskList" class="status-list"></ul>
+        </div>
+        <div class="section-block">
+          <h2>判定サマリー</h2>
+          <div id="summaryBox" class="summary-box"></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <aside id="caseDrawer" class="case-drawer" aria-labelledby="caseDrawerTitle" hidden>
+    <div class="drawer-panel" role="dialog" aria-modal="true">
+      <header>
+        <div>
+          <p class="eyebrow">社内共有</p>
+          <h2 id="caseDrawerTitle">Amazonリサーチ一覧</h2>
+        </div>
+        <button id="closeCasesButton" class="icon-button" type="button" aria-label="閉じる" data-tip="共有一覧を閉じます。">
+          <i data-lucide="x" aria-hidden="true"></i>
+        </button>
+      </header>
+      <div id="caseList" class="case-list"></div>
+    </div>
+  </aside>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

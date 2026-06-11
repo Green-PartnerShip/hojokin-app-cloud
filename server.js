@@ -71,6 +71,7 @@ const SHARED_HISTORY_FILE = path.join(APP_DATA_DIR, "shared-search-history.json"
 const SAVED_SUBSIDIES_FILE = path.join(APP_DATA_DIR, "saved-subsidies.json");
 const GP_STORE_FILE = path.join(APP_DATA_DIR, "gp-shared-store.json");
 const GP_BACKUPS_FILE = path.join(APP_DATA_DIR, "gp-shared-backups.json");
+const AMAZON_RESEARCH_FILE = path.join(APP_DATA_DIR, "amazon-research-cases.json");
 const PHRASE_STOCK_STORE_ID = "main";
 let taskStoreReady = null;
 let taskFileQueue = Promise.resolve();
@@ -78,6 +79,8 @@ let explanationDraftFileQueue = Promise.resolve();
 let phraseStockFileQueue = Promise.resolve();
 let sharedDataFileQueue = Promise.resolve();
 let gpFileQueue = Promise.resolve();
+let amazonResearchStoreReady = null;
+let amazonResearchFileQueue = Promise.resolve();
 
 if (PUBLIC_ACCESS) {
   app.set("trust proxy", 1);
@@ -537,6 +540,196 @@ const mutateTaskStore = async (work) => {
   return run;
 };
 
+const cleanAmazonText = (value, maxLength = 180) => String(value || "").trim().slice(0, maxLength);
+
+const sanitizeAmazonState = (value) => (
+  value && typeof value === "object" && !Array.isArray(value) ? value : {}
+);
+
+const normalizeAmazonResearchCase = (record = {}) => {
+  const now = new Date().toISOString();
+  const state = sanitizeAmazonState(record.state || record.payload);
+  const product = sanitizeAmazonState(state.product);
+  const scoreSource = record.score ?? state.summary?.totalScore ?? state.totalScore;
+  return {
+    id: cleanAmazonText(record.id, 120) || crypto.randomUUID(),
+    title: cleanAmazonText(record.title || product.name || state.name, 180) || "商品名未入力",
+    category: cleanAmazonText(record.category || product.category || state.category, 100),
+    stage: cleanAmazonText(record.stage || product.stage || state.stage || "一次調査", 80),
+    score: Math.max(0, Math.min(100, Math.round(Number(scoreSource || 0)))),
+    decision: cleanAmazonText(record.decision || state.summary?.decision || state.decision, 80),
+    state,
+    createdAt: isoDate(record.createdAt || record.created_at, now),
+    updatedAt: isoDate(record.updatedAt || record.updated_at, now),
+    updatedBy: cleanAmazonText(record.updatedBy || record.updated_by || "利用者", 80),
+    revision: Math.max(1, Number(record.revision || 1))
+  };
+};
+
+const rowToAmazonResearchCase = (row = {}) => normalizeAmazonResearchCase({
+  id: row.id,
+  title: row.title,
+  category: row.category,
+  stage: row.stage,
+  score: row.score,
+  decision: row.decision,
+  state: row.payload,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  updatedBy: row.updated_by,
+  revision: row.revision
+});
+
+const ensureAmazonResearchStore = async () => {
+  if (amazonResearchStoreReady) return amazonResearchStoreReady;
+  amazonResearchStoreReady = (async () => {
+    if (pgPool) {
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS amazon_research_cases (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT '',
+          stage TEXT NOT NULL DEFAULT '',
+          score INTEGER NOT NULL DEFAULT 0,
+          decision TEXT NOT NULL DEFAULT '',
+          payload JSONB NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_by TEXT NOT NULL DEFAULT '利用者',
+          revision INTEGER NOT NULL DEFAULT 1
+        )
+      `);
+      await pgPool.query("CREATE INDEX IF NOT EXISTS amazon_research_cases_updated_idx ON amazon_research_cases(updated_at DESC)");
+      return;
+    }
+    await fs.promises.mkdir(path.dirname(AMAZON_RESEARCH_FILE), { recursive: true });
+    try {
+      await fs.promises.access(AMAZON_RESEARCH_FILE);
+    } catch {
+      await fs.promises.writeFile(AMAZON_RESEARCH_FILE, JSON.stringify({ version: 1, cases: [], updatedAt: null }, null, 2), "utf8");
+    }
+  })();
+  return amazonResearchStoreReady;
+};
+
+const readAmazonResearchStore = async () => {
+  await ensureAmazonResearchStore();
+  if (pgPool) {
+    const result = await pgPool.query(`
+      SELECT id, title, category, stage, score, decision, payload, created_at, updated_at, updated_by, revision
+      FROM amazon_research_cases
+      ORDER BY updated_at DESC
+      LIMIT 100
+    `);
+    return {
+      cases: result.rows.map(rowToAmazonResearchCase),
+      updatedAt: result.rows[0]?.updated_at ? new Date(result.rows[0].updated_at).toISOString() : null
+    };
+  }
+  const content = await fs.promises.readFile(AMAZON_RESEARCH_FILE, "utf8");
+  const parsed = JSON.parse(content);
+  return {
+    cases: Array.isArray(parsed.cases) ? parsed.cases.map(normalizeAmazonResearchCase) : [],
+    updatedAt: parsed.updatedAt || null
+  };
+};
+
+const writeAmazonResearchFile = async (cases) => {
+  await ensureAmazonResearchStore();
+  const store = { version: 1, cases: cases.map(normalizeAmazonResearchCase), updatedAt: new Date().toISOString() };
+  await fs.promises.mkdir(path.dirname(AMAZON_RESEARCH_FILE), { recursive: true });
+  const temporaryFile = `${AMAZON_RESEARCH_FILE}.${process.pid}.${Date.now()}.tmp`;
+  await fs.promises.writeFile(temporaryFile, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+  await fs.promises.rename(temporaryFile, AMAZON_RESEARCH_FILE);
+  return store;
+};
+
+const saveAmazonResearchCase = async (body = {}) => {
+  const now = new Date().toISOString();
+  const incoming = normalizeAmazonResearchCase({ ...body, state: body.state || body.payload });
+  if (pgPool) {
+    await ensureAmazonResearchStore();
+    const current = incoming.id
+      ? await pgPool.query("SELECT * FROM amazon_research_cases WHERE id = $1", [incoming.id])
+      : { rows: [] };
+    const existing = current.rows[0] ? rowToAmazonResearchCase(current.rows[0]) : null;
+    const record = normalizeAmazonResearchCase({
+      ...incoming,
+      id: existing?.id || incoming.id || crypto.randomUUID(),
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+      revision: existing ? Number(existing.revision || 1) + 1 : 1
+    });
+    await pgPool.query(`
+      INSERT INTO amazon_research_cases
+        (id, title, category, stage, score, decision, payload, created_at, updated_at, updated_by, revision)
+      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11)
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        category = EXCLUDED.category,
+        stage = EXCLUDED.stage,
+        score = EXCLUDED.score,
+        decision = EXCLUDED.decision,
+        payload = EXCLUDED.payload,
+        updated_at = EXCLUDED.updated_at,
+        updated_by = EXCLUDED.updated_by,
+        revision = EXCLUDED.revision
+    `, [
+      record.id,
+      record.title,
+      record.category,
+      record.stage,
+      record.score,
+      record.decision,
+      JSON.stringify(record.state),
+      record.createdAt,
+      record.updatedAt,
+      record.updatedBy,
+      record.revision
+    ]);
+    return record;
+  }
+
+  const run = amazonResearchFileQueue.then(async () => {
+    const current = await readAmazonResearchStore();
+    const index = current.cases.findIndex((item) => item.id === incoming.id);
+    const existing = index >= 0 ? current.cases[index] : null;
+    const record = normalizeAmazonResearchCase({
+      ...incoming,
+      id: existing?.id || incoming.id || crypto.randomUUID(),
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+      revision: existing ? Number(existing.revision || 1) + 1 : 1
+    });
+    const nextCases = index >= 0
+      ? current.cases.map((item) => (item.id === record.id ? record : item))
+      : [record, ...current.cases];
+    await writeAmazonResearchFile(nextCases);
+    return record;
+  });
+  amazonResearchFileQueue = run.catch(() => {});
+  return run;
+};
+
+const deleteAmazonResearchCase = async (id) => {
+  const cleanId = cleanAmazonText(id, 120);
+  if (!cleanId) return false;
+  if (pgPool) {
+    await ensureAmazonResearchStore();
+    const result = await pgPool.query("DELETE FROM amazon_research_cases WHERE id = $1", [cleanId]);
+    return result.rowCount > 0;
+  }
+  const run = amazonResearchFileQueue.then(async () => {
+    const current = await readAmazonResearchStore();
+    const nextCases = current.cases.filter((item) => item.id !== cleanId);
+    if (nextCases.length === current.cases.length) return false;
+    await writeAmazonResearchFile(nextCases);
+    return true;
+  });
+  amazonResearchFileQueue = run.catch(() => {});
+  return run;
+};
+
 const escapeHtml = (value) => String(value ?? "")
   .replace(/&/g, "&amp;")
   .replace(/</g, "&lt;")
@@ -905,6 +1098,11 @@ const renderInternalHub = () => `<!doctype html>
         <strong>説明変換ワークベンチ</strong>
         <span>業務メモを、お客様や社内で共有しやすい説明文に整えます。</span>
       </a>
+      <a class="tile" href="/amazon-research/">
+        <span class="tag">EC調査</span>
+        <strong>Amazon ECリサーチ</strong>
+        <span>商品候補、競合、キーワード、利益、リスクを整理し、参入判断に使います。</span>
+      </a>
       <a class="tile" href="/tasks/">
         <span class="tag">社内管理</span>
         <strong>業務タスクボード</strong>
@@ -952,7 +1150,8 @@ const authGuard = (req, res, next) => {
   const isApiLikePath = req.path.startsWith("/api/") ||
     req.path.startsWith("/explanation/api/") ||
     req.path.startsWith("/internal/hearing/api/") ||
-    req.path.startsWith("/phrase-stock/api/");
+    req.path.startsWith("/phrase-stock/api/") ||
+    req.path.startsWith("/amazon-research/api/");
   if (
     !AUTH_REQUIRED ||
     req.path === "/login" ||
@@ -1032,6 +1231,7 @@ app.use("/api", apiAccessGuard, rateLimit({ name: "api", windowMs: 60 * 1000, ma
 app.use("/explanation/api", apiAccessGuard, rateLimit({ name: "explanation-api", windowMs: 60 * 1000, max: 180 }));
 app.use("/internal/hearing/api", apiAccessGuard, rateLimit({ name: "hearing-api", windowMs: 60 * 1000, max: 240 }));
 app.use("/phrase-stock/api", apiAccessGuard, rateLimit({ name: "phrase-stock-api", windowMs: 60 * 1000, max: 240 }));
+app.use("/amazon-research/api", apiAccessGuard, rateLimit({ name: "amazon-research-api", windowMs: 60 * 1000, max: 240 }));
 
 app.get(/^\/phrase-stock$/, (_req, res) => {
   res.redirect(302, "/phrase-stock/");
@@ -1249,6 +1449,41 @@ app.put("/internal/hearing/api/cases/:id", async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ ok: false, message: "共有データを保存できませんでした。" });
+  }
+});
+
+app.get(/^\/amazon-research$/, (_req, res) => {
+  res.redirect(302, "/amazon-research/");
+});
+
+app.get("/amazon-research/api/cases", async (_req, res) => {
+  try {
+    const store = await readAmazonResearchStore();
+    res.json({ ok: true, ...store, storage: pgPool ? "postgres" : "file" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "Amazonリサーチ一覧を読み込めませんでした。" });
+  }
+});
+
+app.post("/amazon-research/api/cases", async (req, res) => {
+  try {
+    const record = await saveAmazonResearchCase(req.body || {});
+    res.json({ ok: true, case: record, storage: pgPool ? "postgres" : "file" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "Amazonリサーチ案件を保存できませんでした。" });
+  }
+});
+
+app.delete("/amazon-research/api/cases/:id", async (req, res) => {
+  try {
+    const deleted = await deleteAmazonResearchCase(req.params.id);
+    if (!deleted) return res.status(404).json({ ok: false, message: "Amazonリサーチ案件が見つかりません。" });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ ok: false, message: "Amazonリサーチ案件を削除できませんでした。" });
   }
 });
 

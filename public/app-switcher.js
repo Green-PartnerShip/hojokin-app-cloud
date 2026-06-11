@@ -43,6 +43,12 @@
       description: "業務メモを説明文へ整えます。"
     },
     {
+      title: "Amazon ECリサーチ",
+      short: "EC",
+      path: "/amazon-research/",
+      description: "商品候補、競合、利益、参入リスクを整理します。"
+    },
+    {
       title: "業務タスクボード",
       short: "Task",
       path: "/tasks/",
